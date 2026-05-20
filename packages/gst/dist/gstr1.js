@@ -1,3 +1,6 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.generateGSTR1 = generateGSTR1;
 /**
  * Generate GSTR-1 JSON from a set of invoices for a given period.
  *
@@ -8,7 +11,7 @@
  * @param input  Invoices and business GSTIN for the filing period
  * @returns      GSTR-1 JSON object matching GSTN schema
  */
-export function generateGSTR1(input) {
+function generateGSTR1(input) {
     const { gstin, fp, invoices } = input;
     const b2b = [];
     const b2c = [];

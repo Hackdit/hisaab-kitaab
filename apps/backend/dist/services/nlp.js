@@ -1,4 +1,7 @@
-import { parseIntent } from '@hisab-kitaab/nlp';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.processNlp = processNlp;
+const nlp_1 = require("@hisab-kitaab/nlp");
 // Map NLP package intent names → backend intent names
 const INTENT_MAP = {
     create_invoice: 'invoice',
@@ -20,9 +23,9 @@ const INTENT_MAP = {
  * Process natural language input through the NLP pipeline.
  * Delegates to the @hisab-kitaab/nlp package.
  */
-export async function processNlp(params) {
+async function processNlp(params) {
     const { text, state, business_context } = params;
-    const result = await parseIntent({
+    const result = await (0, nlp_1.parseIntent)({
         text,
         conversationState: state ?? {},
         businessContext: {

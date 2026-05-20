@@ -1,11 +1,14 @@
-import { z } from 'zod';
-const inventoryCreateSchema = z.object({
-    business_id: z.string().uuid(),
-    item_name: z.string().min(1),
-    quantity: z.number().min(0),
-    unit: z.string().optional().default('kg'),
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.inventoryRoutes = inventoryRoutes;
+const zod_1 = require("zod");
+const inventoryCreateSchema = zod_1.z.object({
+    business_id: zod_1.z.string().uuid(),
+    item_name: zod_1.z.string().min(1),
+    quantity: zod_1.z.number().min(0),
+    unit: zod_1.z.string().optional().default('kg'),
 });
-export async function inventoryRoutes(fastify) {
+async function inventoryRoutes(fastify) {
     fastify.get('/', async (request, reply) => {
         const businessId = request.query.business_id;
         if (!businessId) {

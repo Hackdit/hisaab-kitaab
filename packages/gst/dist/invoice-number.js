@@ -1,3 +1,4 @@
+"use strict";
 /**
  * Invoice number generation.
  *
@@ -6,12 +7,16 @@
  *
  * Sequence resets at April 1st each year (start of Indian financial year).
  */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getFinancialYear = getFinancialYear;
+exports.generateInvoiceNumber = generateInvoiceNumber;
+exports.parseInvoiceNumber = parseInvoiceNumber;
 /**
  * Get the financial year string for a given date.
  * FY runs April 1 to March 31.
  * e.g. 2025-04-01 → "2526",  2026-03-31 → "2526"
  */
-export function getFinancialYear(date = new Date()) {
+function getFinancialYear(date = new Date()) {
     const year = date.getFullYear();
     const month = date.getMonth(); // 0-indexed: 0=Jan, 3=Apr
     const startYear = month >= 3 ? year : year - 1;
@@ -28,7 +33,7 @@ export function getFinancialYear(date = new Date()) {
  * @param nextSeq     Next sequence number (1-based)
  * @param padLength   How many digits to pad (default 4 → 0001)
  */
-export function generateInvoiceNumber(prefix, fy, nextSeq, padLength = 4) {
+function generateInvoiceNumber(prefix, fy, nextSeq, padLength = 4) {
     const seq = String(nextSeq).padStart(padLength, '0');
     return `${prefix}-${fy}-${seq}`;
 }
@@ -36,7 +41,7 @@ export function generateInvoiceNumber(prefix, fy, nextSeq, padLength = 4) {
  * Parse an invoice number into its components.
  * Returns null if the format doesn't match.
  */
-export function parseInvoiceNumber(invoiceNumber) {
+function parseInvoiceNumber(invoiceNumber) {
     const match = invoiceNumber.match(/^([A-Z]+)-(\d{4})-(\d+)$/);
     if (!match)
         return null;

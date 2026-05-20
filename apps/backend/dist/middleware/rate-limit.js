@@ -1,7 +1,10 @@
-import { redis } from '../plugins/redis';
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.rateLimitByPhone = rateLimitByPhone;
+const redis_1 = require("../plugins/redis");
 const WINDOW_MS = 60 * 1000; // 1 minute
 const MAX_REQUESTS = 20;
-export async function rateLimitByPhone(request, reply) {
+async function rateLimitByPhone(request, reply) {
     // Extract phone from various possible sources
     let phone;
     const body = request.body;
@@ -19,12 +22,12 @@ export async function rateLimitByPhone(request, reply) {
         return; // Skip rate limiting if we can't identify the phone
     const key = `ratelimit:${phone}`;
     try {
-        const current = await redis.incr(key);
+        const current = await redis_1.redis.incr(key);
         if (current === 1) {
-            await redis.pexpire(key, WINDOW_MS);
+            await redis_1.redis.pexpire(key, WINDOW_MS);
         }
         if (current > MAX_REQUESTS) {
-            const ttl = await redis.pttl(key);
+            const ttl = await redis_1.redis.pttl(key);
             const retryAfter = Math.ceil(ttl / 1000);
             reply.header('Retry-After', String(retryAfter));
             return reply.status(429).send({

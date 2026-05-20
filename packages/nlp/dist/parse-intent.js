@@ -1,4 +1,10 @@
-import Anthropic from '@anthropic-ai/sdk';
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.parseIntent = parseIntent;
+const sdk_1 = __importDefault(require("@anthropic-ai/sdk"));
 const CLAUDE_SYSTEM_PROMPT = `You are Hisab-Kitaab's business assistant for Indian MSMEs.
 Extract structured business intent from Hindi/English/Hinglish messages.
 
@@ -83,10 +89,10 @@ OUTPUT FORMAT:
   "suggestedReply": "Chawal ka rate kya hai per kg?",
   "requiresConfirmation": false
 }`;
-export async function parseIntent(input) {
+async function parseIntent(input) {
     const { text, conversationState, businessContext } = input;
     const userMessage = buildContextMessage(text, businessContext, conversationState);
-    const anthropic = new Anthropic({
+    const anthropic = new sdk_1.default({
         apiKey: process.env.ANTHROPIC_API_KEY,
     });
     try {

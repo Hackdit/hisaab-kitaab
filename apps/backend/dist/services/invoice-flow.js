@@ -1,11 +1,48 @@
-import { supabase } from '../plugins/supabase';
-import { redis } from '../plugins/redis';
-import { sendTextMessage, sendDocument } from './whatsapp';
-import { calculateGST } from '@hisab-kitaab/gst';
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.initializeInvoiceState = initializeInvoiceState;
+exports.handleInvoiceFlow = handleInvoiceFlow;
+const supabase_1 = require("../plugins/supabase");
+const redis_1 = require("../plugins/redis");
+const whatsapp_1 = require("./whatsapp");
+const gst_1 = require("@hisab-kitaab/gst");
 const STATE_KEY_PREFIX = 'whatsapp:state:';
 async function loadRedisState(phone) {
     try {
-        const raw = await redis.get(`${STATE_KEY_PREFIX}${phone}`);
+        const raw = await redis_1.redis.get(`${STATE_KEY_PREFIX}${phone}`);
         // @upstash/redis auto-parses JSON on GET
         const state = raw || {};
         console.log('INVOICE FLOW - Loaded Redis state:', JSON.stringify(state));
@@ -19,17 +56,17 @@ async function loadRedisState(phone) {
 async function saveRedisState(phone, state) {
     try {
         // @upstash/redis auto-serializes objects — do NOT JSON.stringify
-        await redis.set(`${STATE_KEY_PREFIX}${phone}`, state, { ex: 86400 });
+        await redis_1.redis.set(`${STATE_KEY_PREFIX}${phone}`, state, { ex: 86400 });
         console.log('INVOICE FLOW - Saved to Redis:', JSON.stringify(state?.invoiceFlow));
     }
     catch (err) {
         console.error('INVOICE FLOW - Redis save error:', err);
     }
 }
-export function initializeInvoiceState() {
+function initializeInvoiceState() {
     return { active: false, step: 'start', items: [] };
 }
-export async function handleInvoiceFlow(fromNumber, message, entities, currentState, business) {
+async function handleInvoiceFlow(fromNumber, message, entities, currentState, business) {
     const state = currentState || {};
     if (!state.invoiceFlow) {
         state.invoiceFlow = initializeInvoiceState();
@@ -201,13 +238,13 @@ export async function handleInvoiceFlow(fromNumber, message, entities, currentSt
                 const sellerState = business.state_code || 'MH';
                 const buyerState = invoiceState.customerState || sellerState;
                 // ── 3. Calculate GST ──
-                const { subtotal, cgst, sgst, igst, totalTax, grandTotal, roundOff, isInterstate } = calculateGST(gstItems, sellerState, buyerState);
+                const { subtotal, cgst, sgst, igst, totalTax, grandTotal, roundOff, isInterstate } = (0, gst_1.calculateGST)(gstItems, sellerState, buyerState);
                 // ── 4. Generate invoice number ──
                 const seq = (business.last_invoice_sequence ?? 0) + 1;
                 const year = new Date().getFullYear();
                 const invoiceNumber = `HK-${year}-${String(seq).padStart(4, '0')}`;
                 // ── 5. Find or create customer ──
-                const { data: existingCustomer } = await supabase
+                const { data: existingCustomer } = await supabase_1.supabase
                     .from('customers')
                     .select('id, whatsapp_number')
                     .eq('business_id', business.id)
@@ -216,7 +253,7 @@ export async function handleInvoiceFlow(fromNumber, message, entities, currentSt
                 let customerId = existingCustomer?.id;
                 const existingPhone = existingCustomer?.whatsapp_number || null;
                 if (!customerId) {
-                    const { data: newCustomer, error: createError } = await supabase
+                    const { data: newCustomer, error: createError } = await supabase_1.supabase
                         .from('customers')
                         .insert({
                         business_id: business.id,
@@ -230,7 +267,7 @@ export async function handleInvoiceFlow(fromNumber, message, entities, currentSt
                     customerId = newCustomer.id;
                 }
                 // ── 6. Insert invoice ──
-                const { data: invoice, error: invoiceError } = await supabase
+                const { data: invoice, error: invoiceError } = await supabase_1.supabase
                     .from('invoices')
                     .insert({
                     business_id: business.id,
@@ -264,24 +301,24 @@ export async function handleInvoiceFlow(fromNumber, message, entities, currentSt
                     gst_rate: item.gstRate,
                     amount: item.quantity * item.rate,
                 }));
-                const { error: itemsError } = await supabase
+                const { error: itemsError } = await supabase_1.supabase
                     .from('invoice_items')
                     .insert(invoiceItems);
                 if (itemsError)
                     throw itemsError;
                 // ── 8. Update business sequence ──
-                await supabase
+                await supabase_1.supabase
                     .from('businesses')
                     .update({ last_invoice_sequence: seq })
                     .eq('id', business.id);
                 // ── 9. Update customer total_outstanding ──
-                const { data: customerData } = await supabase
+                const { data: customerData } = await supabase_1.supabase
                     .from('customers')
                     .select('total_outstanding')
                     .eq('id', customerId)
                     .single();
                 if (customerData) {
-                    await supabase
+                    await supabase_1.supabase
                         .from('customers')
                         .update({
                         total_outstanding: (customerData.total_outstanding || 0) + grandTotal,
@@ -295,7 +332,7 @@ export async function handleInvoiceFlow(fromNumber, message, entities, currentSt
                     .join(', ');
                 let pdfUrl = null;
                 try {
-                    const { generateSimpleInvoicePDF } = await import('@hisab-kitaab/pdf');
+                    const { generateSimpleInvoicePDF } = await Promise.resolve().then(() => __importStar(require('@hisab-kitaab/pdf')));
                     const pdfBuffer = await generateSimpleInvoicePDF({
                         businessName: business.business_name || business.businessName || business.name || 'Business',
                         businessAddress: business.address,
@@ -317,25 +354,25 @@ export async function handleInvoiceFlow(fromNumber, message, entities, currentSt
                     });
                     // ── 11. Upload to Supabase Storage ──
                     const bucketName = 'invoices';
-                    const { data: buckets } = await supabase.storage.listBuckets();
+                    const { data: buckets } = await supabase_1.supabase.storage.listBuckets();
                     if (!buckets?.find((b) => b.id === bucketName)) {
-                        await supabase.storage.createBucket(bucketName, {
+                        await supabase_1.supabase.storage.createBucket(bucketName, {
                             public: true,
                             allowedMimeTypes: ['application/pdf'],
                         });
                     }
                     const filePath = `${business.id}/${invoiceNumber}.pdf`;
-                    const { error: uploadError } = await supabase.storage
+                    const { error: uploadError } = await supabase_1.supabase.storage
                         .from(bucketName)
                         .upload(filePath, pdfBuffer, {
                         contentType: 'application/pdf',
                         upsert: true,
                     });
                     if (!uploadError) {
-                        const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(filePath);
+                        const { data: urlData } = supabase_1.supabase.storage.from(bucketName).getPublicUrl(filePath);
                         pdfUrl = urlData?.publicUrl || null;
                         if (pdfUrl) {
-                            await supabase
+                            await supabase_1.supabase
                                 .from('invoices')
                                 .update({
                                 pdf_url: pdfUrl,
@@ -359,10 +396,10 @@ export async function handleInvoiceFlow(fromNumber, message, entities, currentSt
                     `Payment: ${mode}\n\n` +
                     `PDF ready hai 👆`;
                 if (pdfUrl) {
-                    await sendDocument(fromNumber, pdfUrl, ownerMsg);
+                    await (0, whatsapp_1.sendDocument)(fromNumber, pdfUrl, ownerMsg);
                 }
                 else {
-                    await sendTextMessage(fromNumber, ownerMsg.replace('\n\nPDF ready hai 👆', ''));
+                    await (0, whatsapp_1.sendTextMessage)(fromNumber, ownerMsg.replace('\n\nPDF ready hai 👆', ''));
                 }
                 // ── 13. Send to customer if phone available ──
                 if (existingPhone && pdfUrl) {
@@ -374,7 +411,7 @@ export async function handleInvoiceFlow(fromNumber, message, entities, currentSt
                         `Items: ${itemSummary}\n\n` +
                         `Payment: ${mode}\n\n` +
                         `Dhanyawad! 🙏`;
-                    await sendDocument(existingPhone, pdfUrl, customerMsg);
+                    await (0, whatsapp_1.sendDocument)(existingPhone, pdfUrl, customerMsg);
                     responseMessage = `✅ Invoice bhej diya gaya hai! Koi aur kaam?`;
                     Object.assign(invoiceState, initializeInvoiceState());
                 }
@@ -412,12 +449,12 @@ export async function handleInvoiceFlow(fromNumber, message, entities, currentSt
             const phone = message.trim().replace(/[^\d]/g, '').replace(/^91/, '');
             if (phone.length >= 10) {
                 // Save phone to customer
-                await supabase
+                await supabase_1.supabase
                     .from('customers')
                     .update({ whatsapp_number: phone })
                     .eq('id', invoiceState.customerId);
                 // Fetch and send PDF if we have one
-                const { data: inv } = await supabase
+                const { data: inv } = await supabase_1.supabase
                     .from('invoices')
                     .select('pdf_url')
                     .eq('invoice_number', invoiceState.lastCreatedInvoiceNumber)
@@ -431,7 +468,7 @@ export async function handleInvoiceFlow(fromNumber, message, entities, currentSt
                         `Items: ${invoiceState.lastCreatedInvoiceItems}\n\n` +
                         `Payment: ${invoiceState.lastPaymentMode}\n\n` +
                         `Dhanyawad! 🙏`;
-                    await sendDocument(phone, inv.pdf_url, customerMsg);
+                    await (0, whatsapp_1.sendDocument)(phone, inv.pdf_url, customerMsg);
                 }
                 responseMessage =
                     `✅ Invoice ${invoiceState.lastCreatedInvoiceNumber} customer ko bhej diya! Koi aur kaam?`;
@@ -462,7 +499,7 @@ export async function handleInvoiceFlow(fromNumber, message, entities, currentSt
     console.log('AFTER SAVE - verifying...');
     const verify = await loadRedisState(fromNumber);
     console.log('VERIFY READ BACK:', JSON.stringify(verify));
-    await sendTextMessage(fromNumber, responseMessage);
+    await (0, whatsapp_1.sendTextMessage)(fromNumber, responseMessage);
     return { state: newState };
 }
 function parseItemsFromMessage(message) {

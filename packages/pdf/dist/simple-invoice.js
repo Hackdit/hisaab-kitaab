@@ -1,9 +1,45 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
-import { amountInWords } from '@hisab-kitaab/gst';
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.generateSimpleInvoicePDF = generateSimpleInvoicePDF;
+const jsx_runtime_1 = require("react/jsx-runtime");
+const renderer_1 = require("@react-pdf/renderer");
+const gst_1 = require("@hisab-kitaab/gst");
 const MARGIN = 40;
 const COL_W = 595.28 - 2 * MARGIN;
-const styles = StyleSheet.create({
+const styles = renderer_1.StyleSheet.create({
     page: {
         padding: MARGIN,
         fontSize: 8,
@@ -170,14 +206,14 @@ const styles = StyleSheet.create({
 });
 function SimpleInvoiceDocument({ data }) {
     const fmt = (n) => `Rs. ${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    return (_jsx(Document, { children: _jsxs(Page, { size: "A4", style: styles.page, children: [_jsxs(View, { style: styles.headerRow, children: [_jsxs(View, { children: [_jsx(Text, { style: styles.businessName, children: data.businessName }), data.businessAddress && (_jsx(Text, { style: styles.businessDetail, children: data.businessAddress })), _jsxs(Text, { style: styles.businessDetail, children: ["GSTIN: ", data.businessGstin || 'N/A'] })] }), _jsxs(View, { style: styles.headerRight, children: [_jsx(Text, { style: styles.taxInvoiceTitle, children: "TAX INVOICE" }), _jsxs(Text, { style: styles.invoiceMeta, children: ["Invoice No: ", data.invoiceNumber] }), _jsxs(Text, { style: styles.invoiceMeta, children: ["Date: ", data.date] })] })] }), _jsxs(View, { style: styles.addressBox, children: [_jsx(Text, { style: styles.addressTitle, children: "Bill To" }), _jsx(Text, { style: styles.addressText, children: data.customerName })] }), _jsxs(View, { style: styles.table, children: [_jsxs(View, { style: styles.tableHeader, children: [_jsx(Text, { style: [styles.tableHeaderText, styles.colDesc], children: "Description" }), _jsx(Text, { style: [styles.tableHeaderText, styles.colQty], children: "Qty" }), _jsx(Text, { style: [styles.tableHeaderText, styles.colUnit], children: "Unit" }), _jsx(Text, { style: [styles.tableHeaderText, styles.colRate], children: "Rate" }), _jsx(Text, { style: [styles.tableHeaderText, styles.colGstPct], children: "GST%" }), _jsx(Text, { style: [styles.tableHeaderText, styles.colTotal], children: "Amount" })] }), data.items.map((item, i) => {
+    return ((0, jsx_runtime_1.jsx)(renderer_1.Document, { children: (0, jsx_runtime_1.jsxs)(renderer_1.Page, { size: "A4", style: styles.page, children: [(0, jsx_runtime_1.jsxs)(renderer_1.View, { style: styles.headerRow, children: [(0, jsx_runtime_1.jsxs)(renderer_1.View, { children: [(0, jsx_runtime_1.jsx)(renderer_1.Text, { style: styles.businessName, children: data.businessName }), data.businessAddress && ((0, jsx_runtime_1.jsx)(renderer_1.Text, { style: styles.businessDetail, children: data.businessAddress })), (0, jsx_runtime_1.jsxs)(renderer_1.Text, { style: styles.businessDetail, children: ["GSTIN: ", data.businessGstin || 'N/A'] })] }), (0, jsx_runtime_1.jsxs)(renderer_1.View, { style: styles.headerRight, children: [(0, jsx_runtime_1.jsx)(renderer_1.Text, { style: styles.taxInvoiceTitle, children: "TAX INVOICE" }), (0, jsx_runtime_1.jsxs)(renderer_1.Text, { style: styles.invoiceMeta, children: ["Invoice No: ", data.invoiceNumber] }), (0, jsx_runtime_1.jsxs)(renderer_1.Text, { style: styles.invoiceMeta, children: ["Date: ", data.date] })] })] }), (0, jsx_runtime_1.jsxs)(renderer_1.View, { style: styles.addressBox, children: [(0, jsx_runtime_1.jsx)(renderer_1.Text, { style: styles.addressTitle, children: "Bill To" }), (0, jsx_runtime_1.jsx)(renderer_1.Text, { style: styles.addressText, children: data.customerName })] }), (0, jsx_runtime_1.jsxs)(renderer_1.View, { style: styles.table, children: [(0, jsx_runtime_1.jsxs)(renderer_1.View, { style: styles.tableHeader, children: [(0, jsx_runtime_1.jsx)(renderer_1.Text, { style: [styles.tableHeaderText, styles.colDesc], children: "Description" }), (0, jsx_runtime_1.jsx)(renderer_1.Text, { style: [styles.tableHeaderText, styles.colQty], children: "Qty" }), (0, jsx_runtime_1.jsx)(renderer_1.Text, { style: [styles.tableHeaderText, styles.colUnit], children: "Unit" }), (0, jsx_runtime_1.jsx)(renderer_1.Text, { style: [styles.tableHeaderText, styles.colRate], children: "Rate" }), (0, jsx_runtime_1.jsx)(renderer_1.Text, { style: [styles.tableHeaderText, styles.colGstPct], children: "GST%" }), (0, jsx_runtime_1.jsx)(renderer_1.Text, { style: [styles.tableHeaderText, styles.colTotal], children: "Amount" })] }), data.items.map((item, i) => {
                             const amount = item.quantity * item.rate;
-                            return (_jsxs(View, { style: i % 2 === 1 ? [styles.tableRow, styles.tableRowAlt] : styles.tableRow, children: [_jsx(Text, { style: [styles.tableCell, styles.colDesc], children: item.description }), _jsx(Text, { style: [styles.tableCell, styles.colQty], children: item.quantity }), _jsx(Text, { style: [styles.tableCell, styles.colUnit], children: item.unit }), _jsx(Text, { style: [styles.tableCell, styles.colRate], children: fmt(item.rate) }), _jsxs(Text, { style: [styles.tableCell, styles.colGstPct], children: [item.gstRate, "%"] }), _jsx(Text, { style: [styles.tableCell, styles.colTotal], children: fmt(amount) })] }, i));
-                        })] }), _jsx(View, { style: styles.totalsSection, children: _jsxs(View, { style: styles.totalsBox, children: [_jsxs(View, { style: styles.totalRow, children: [_jsx(Text, { style: styles.totalLabel, children: "Subtotal" }), _jsx(Text, { style: styles.totalValue, children: fmt(data.subtotal) })] }), _jsxs(View, { style: styles.totalRow, children: [_jsx(Text, { style: styles.totalLabel, children: "GST" }), _jsx(Text, { style: styles.totalValue, children: fmt(data.gstAmount) })] }), _jsxs(View, { style: styles.grandTotalRow, children: [_jsx(Text, { style: styles.grandTotalLabel, children: "TOTAL" }), _jsx(Text, { style: styles.grandTotalValue, children: fmt(data.total) })] }), _jsx(Text, { style: styles.amountInWords, children: amountInWords(data.total) })] }) }), _jsxs(View, { style: styles.paymentRow, children: [_jsx(Text, { style: styles.paymentLabel, children: "Payment Mode:" }), _jsx(Text, { style: styles.paymentValue, children: data.paymentMode })] }), _jsx(View, { style: styles.footer, children: _jsx(Text, { style: styles.footerText, children: "This is a computer-generated invoice" }) })] }) }));
+                            return ((0, jsx_runtime_1.jsxs)(renderer_1.View, { style: i % 2 === 1 ? [styles.tableRow, styles.tableRowAlt] : styles.tableRow, children: [(0, jsx_runtime_1.jsx)(renderer_1.Text, { style: [styles.tableCell, styles.colDesc], children: item.description }), (0, jsx_runtime_1.jsx)(renderer_1.Text, { style: [styles.tableCell, styles.colQty], children: item.quantity }), (0, jsx_runtime_1.jsx)(renderer_1.Text, { style: [styles.tableCell, styles.colUnit], children: item.unit }), (0, jsx_runtime_1.jsx)(renderer_1.Text, { style: [styles.tableCell, styles.colRate], children: fmt(item.rate) }), (0, jsx_runtime_1.jsxs)(renderer_1.Text, { style: [styles.tableCell, styles.colGstPct], children: [item.gstRate, "%"] }), (0, jsx_runtime_1.jsx)(renderer_1.Text, { style: [styles.tableCell, styles.colTotal], children: fmt(amount) })] }, i));
+                        })] }), (0, jsx_runtime_1.jsx)(renderer_1.View, { style: styles.totalsSection, children: (0, jsx_runtime_1.jsxs)(renderer_1.View, { style: styles.totalsBox, children: [(0, jsx_runtime_1.jsxs)(renderer_1.View, { style: styles.totalRow, children: [(0, jsx_runtime_1.jsx)(renderer_1.Text, { style: styles.totalLabel, children: "Subtotal" }), (0, jsx_runtime_1.jsx)(renderer_1.Text, { style: styles.totalValue, children: fmt(data.subtotal) })] }), (0, jsx_runtime_1.jsxs)(renderer_1.View, { style: styles.totalRow, children: [(0, jsx_runtime_1.jsx)(renderer_1.Text, { style: styles.totalLabel, children: "GST" }), (0, jsx_runtime_1.jsx)(renderer_1.Text, { style: styles.totalValue, children: fmt(data.gstAmount) })] }), (0, jsx_runtime_1.jsxs)(renderer_1.View, { style: styles.grandTotalRow, children: [(0, jsx_runtime_1.jsx)(renderer_1.Text, { style: styles.grandTotalLabel, children: "TOTAL" }), (0, jsx_runtime_1.jsx)(renderer_1.Text, { style: styles.grandTotalValue, children: fmt(data.total) })] }), (0, jsx_runtime_1.jsx)(renderer_1.Text, { style: styles.amountInWords, children: (0, gst_1.amountInWords)(data.total) })] }) }), (0, jsx_runtime_1.jsxs)(renderer_1.View, { style: styles.paymentRow, children: [(0, jsx_runtime_1.jsx)(renderer_1.Text, { style: styles.paymentLabel, children: "Payment Mode:" }), (0, jsx_runtime_1.jsx)(renderer_1.Text, { style: styles.paymentValue, children: data.paymentMode })] }), (0, jsx_runtime_1.jsx)(renderer_1.View, { style: styles.footer, children: (0, jsx_runtime_1.jsx)(renderer_1.Text, { style: styles.footerText, children: "This is a computer-generated invoice" }) })] }) }));
 }
-export async function generateSimpleInvoicePDF(data) {
-    const { renderToBuffer } = await import('@react-pdf/renderer');
-    return renderToBuffer(_jsx(SimpleInvoiceDocument, { data: data }));
+async function generateSimpleInvoicePDF(data) {
+    const { renderToBuffer } = await Promise.resolve().then(() => __importStar(require('@react-pdf/renderer')));
+    return renderToBuffer((0, jsx_runtime_1.jsx)(SimpleInvoiceDocument, { data: data }));
 }
-export default SimpleInvoiceDocument;
+exports.default = SimpleInvoiceDocument;
 //# sourceMappingURL=simple-invoice.js.map

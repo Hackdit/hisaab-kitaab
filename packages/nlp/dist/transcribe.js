@@ -1,17 +1,23 @@
-import OpenAI from 'openai';
-import { writeFile, unlink } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-export async function transcribeVoiceNote(audioBuffer, mimeType = 'audio/ogg', language = 'hi') {
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.transcribeVoiceNote = transcribeVoiceNote;
+const openai_1 = __importDefault(require("openai"));
+const promises_1 = require("node:fs/promises");
+const node_crypto_1 = require("node:crypto");
+const node_path_1 = require("node:path");
+const node_os_1 = require("node:os");
+async function transcribeVoiceNote(audioBuffer, mimeType = 'audio/ogg', language = 'hi') {
     const startTime = performance.now();
-    const openai = new OpenAI({
+    const openai = new openai_1.default({
         apiKey: process.env.OPENAI_API_KEY,
     });
     const ext = extensionFromMime(mimeType);
-    const tempFilePath = join(tmpdir(), `hk-voice-${randomUUID()}${ext}`);
+    const tempFilePath = (0, node_path_1.join)((0, node_os_1.tmpdir)(), `hk-voice-${(0, node_crypto_1.randomUUID)()}${ext}`);
     try {
-        await writeFile(tempFilePath, audioBuffer);
+        await (0, promises_1.writeFile)(tempFilePath, audioBuffer);
         const response = await openai.audio.transcriptions.create({
             file: tempFilePath,
             model: 'whisper-1',
@@ -29,7 +35,7 @@ export async function transcribeVoiceNote(audioBuffer, mimeType = 'audio/ogg', l
     }
     finally {
         try {
-            await unlink(tempFilePath);
+            await (0, promises_1.unlink)(tempFilePath);
         }
         catch {
         }

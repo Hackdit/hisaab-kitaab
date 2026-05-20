@@ -1,8 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { parseIntent } from '../parse-intent.js';
-const mockMessagesCreate = vi.fn();
-vi.mock('@anthropic-ai/sdk', () => ({
-    default: vi.fn().mockImplementation(() => ({
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const vitest_1 = require("vitest");
+const parse_intent_js_1 = require("../parse-intent.js");
+const mockMessagesCreate = vitest_1.vi.fn();
+vitest_1.vi.mock('@anthropic-ai/sdk', () => ({
+    default: vitest_1.vi.fn().mockImplementation(() => ({
         messages: {
             create: mockMessagesCreate,
         },
@@ -22,18 +24,18 @@ async function runWithMock(text, mockResponse) {
     mockMessagesCreate.mockResolvedValueOnce({
         content: [{ type: 'text', text: JSON.stringify(mockResponse) }],
     });
-    return parseIntent({ ...BASE_INPUT, text });
+    return (0, parse_intent_js_1.parseIntent)({ ...BASE_INPUT, text });
 }
 async function runFallback(text) {
     mockMessagesCreate.mockRejectedValueOnce(new Error('API unavailable'));
-    return parseIntent({ ...BASE_INPUT, text });
+    return (0, parse_intent_js_1.parseIntent)({ ...BASE_INPUT, text });
 }
-describe('parseIntent (Claude branch)', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+(0, vitest_1.describe)('parseIntent (Claude branch)', () => {
+    (0, vitest_1.beforeEach)(() => {
+        vitest_1.vi.clearAllMocks();
         process.env.ANTHROPIC_API_KEY = 'test-key';
     });
-    it('classifies create_invoice intent', async () => {
+    (0, vitest_1.it)('classifies create_invoice intent', async () => {
         const result = await runWithMock('Ramesh ko 10kg chawal ka invoice bhejo', {
             intent: 'create_invoice',
             confidence: 0.92,
@@ -47,14 +49,14 @@ describe('parseIntent (Claude branch)', () => {
             suggestedReply: 'Chawal ka rate kya hai per kg?',
             requiresConfirmation: false,
         });
-        expect(result.intent).toBe('create_invoice');
-        expect(result.entities.customer).toBe('Ramesh');
-        expect(result.entities.items).toHaveLength(1);
-        expect(result.entities.items[0].name).toBe('chawal');
-        expect(result.missingFields).toContain('items[0].rate');
-        expect(result.suggestedReply).toBeTruthy();
+        (0, vitest_1.expect)(result.intent).toBe('create_invoice');
+        (0, vitest_1.expect)(result.entities.customer).toBe('Ramesh');
+        (0, vitest_1.expect)(result.entities.items).toHaveLength(1);
+        (0, vitest_1.expect)(result.entities.items[0].name).toBe('chawal');
+        (0, vitest_1.expect)(result.missingFields).toContain('items[0].rate');
+        (0, vitest_1.expect)(result.suggestedReply).toBeTruthy();
     });
-    it('classifies record_payment intent for UPI payment', async () => {
+    (0, vitest_1.it)('classifies record_payment intent for UPI payment', async () => {
         const result = await runWithMock('sharma ji ne 2000 diye upi se', {
             intent: 'record_payment',
             confidence: 0.95,
@@ -67,12 +69,12 @@ describe('parseIntent (Claude branch)', () => {
             suggestedReply: 'Sharma ji ka ₹2000 upi se receive ho gaya ✅',
             requiresConfirmation: false,
         });
-        expect(result.intent).toBe('record_payment');
-        expect(result.entities.customer).toBe('sharma ji');
-        expect(result.entities.amount).toBe(2000);
-        expect(result.entities.payment_mode).toBe('upi');
+        (0, vitest_1.expect)(result.intent).toBe('record_payment');
+        (0, vitest_1.expect)(result.entities.customer).toBe('sharma ji');
+        (0, vitest_1.expect)(result.entities.amount).toBe(2000);
+        (0, vitest_1.expect)(result.entities.payment_mode).toBe('upi');
     });
-    it('classifies add_stock intent', async () => {
+    (0, vitest_1.it)('classifies add_stock intent', async () => {
         const result = await runWithMock('50 packet biscuit aaye aaj', {
             intent: 'add_stock',
             confidence: 0.88,
@@ -84,13 +86,13 @@ describe('parseIntent (Claude branch)', () => {
             suggestedReply: '50 packet biscuit stock mein add ho gaye ✅',
             requiresConfirmation: false,
         });
-        expect(result.intent).toBe('add_stock');
-        expect(result.entities.movement).toBe('in');
+        (0, vitest_1.expect)(result.intent).toBe('add_stock');
+        (0, vitest_1.expect)(result.entities.movement).toBe('in');
         if (result.entities.items) {
-            expect(result.entities.items[0].name).toBe('biscuit');
+            (0, vitest_1.expect)(result.entities.items[0].name).toBe('biscuit');
         }
     });
-    it('classifies check_udhaar intent', async () => {
+    (0, vitest_1.it)('classifies check_udhaar intent', async () => {
         const result = await runWithMock('suresh ka kitna baaki hai', {
             intent: 'check_udhaar',
             confidence: 0.94,
@@ -99,10 +101,10 @@ describe('parseIntent (Claude branch)', () => {
             suggestedReply: 'Suresh par ₹0 ka baaki hai. Sab clear hai ✅',
             requiresConfirmation: false,
         });
-        expect(result.intent).toBe('check_udhaar');
-        expect(result.entities.customer).toBe('suresh');
+        (0, vitest_1.expect)(result.intent).toBe('check_udhaar');
+        (0, vitest_1.expect)(result.entities.customer).toBe('suresh');
     });
-    it('classifies view_report intent', async () => {
+    (0, vitest_1.it)('classifies view_report intent', async () => {
         const result = await runWithMock('aaj kitna hua', {
             intent: 'view_report',
             confidence: 0.91,
@@ -111,10 +113,10 @@ describe('parseIntent (Claude branch)', () => {
             suggestedReply: 'Aaj ki report le raha hoon...',
             requiresConfirmation: false,
         });
-        expect(result.intent).toBe('view_report');
-        expect(result.entities.period).toBe('today');
+        (0, vitest_1.expect)(result.intent).toBe('view_report');
+        (0, vitest_1.expect)(result.entities.period).toBe('today');
     });
-    it('classifies cancel_invoice intent', async () => {
+    (0, vitest_1.it)('classifies cancel_invoice intent', async () => {
         const result = await runWithMock('invoice number 47 cancel karo', {
             intent: 'cancel_invoice',
             confidence: 0.96,
@@ -123,11 +125,11 @@ describe('parseIntent (Claude branch)', () => {
             suggestedReply: 'Kya aap invoice #47 cancel karna chahte hain?',
             requiresConfirmation: true,
         });
-        expect(result.intent).toBe('cancel_invoice');
-        expect(result.entities.invoice_number).toBe(47);
-        expect(result.requiresConfirmation).toBe(true);
+        (0, vitest_1.expect)(result.intent).toBe('cancel_invoice');
+        (0, vitest_1.expect)(result.entities.invoice_number).toBe(47);
+        (0, vitest_1.expect)(result.requiresConfirmation).toBe(true);
     });
-    it('overrides to unknown when confidence < 0.6', async () => {
+    (0, vitest_1.it)('overrides to unknown when confidence < 0.6', async () => {
         const result = await runWithMock('some random gibberish', {
             intent: 'create_invoice',
             confidence: 0.4,
@@ -136,11 +138,11 @@ describe('parseIntent (Claude branch)', () => {
             suggestedReply: '',
             requiresConfirmation: false,
         });
-        expect(result.intent).toBe('unknown');
-        expect(result.confidence).toBeLessThan(0.6);
-        expect(result.suggestedReply).toBeTruthy();
+        (0, vitest_1.expect)(result.intent).toBe('unknown');
+        (0, vitest_1.expect)(result.confidence).toBeLessThan(0.6);
+        (0, vitest_1.expect)(result.suggestedReply).toBeTruthy();
     });
-    it('maps invalid intent strings to unknown', async () => {
+    (0, vitest_1.it)('maps invalid intent strings to unknown', async () => {
         const result = await runWithMock('blah blah', {
             intent: 'send_money',
             confidence: 0.85,
@@ -149,55 +151,55 @@ describe('parseIntent (Claude branch)', () => {
             suggestedReply: 'Sorry?',
             requiresConfirmation: false,
         });
-        expect(result.intent).toBe('unknown');
+        (0, vitest_1.expect)(result.intent).toBe('unknown');
     });
 });
-describe('parseIntent (fallback)', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+(0, vitest_1.describe)('parseIntent (fallback)', () => {
+    (0, vitest_1.beforeEach)(() => {
+        vitest_1.vi.clearAllMocks();
         process.env.ANTHROPIC_API_KEY = 'test-key';
     });
-    it('fallback: invoice keywords', async () => {
+    (0, vitest_1.it)('fallback: invoice keywords', async () => {
         const result = await runFallback('Ramesh ka invoice banao');
-        expect(result.intent).toBe('create_invoice');
-        expect(result.suggestedReply.toLowerCase()).toContain('invoice');
+        (0, vitest_1.expect)(result.intent).toBe('create_invoice');
+        (0, vitest_1.expect)(result.suggestedReply.toLowerCase()).toContain('invoice');
     });
-    it('fallback: payment keywords', async () => {
+    (0, vitest_1.it)('fallback: payment keywords', async () => {
         const result = await runFallback('Ramesh ne rupaye diye');
-        expect(result.intent).toBe('record_payment');
+        (0, vitest_1.expect)(result.intent).toBe('record_payment');
     });
-    it('fallback: stock keywords', async () => {
+    (0, vitest_1.it)('fallback: stock keywords', async () => {
         const result = await runFallback('50 kg chawal aaya');
-        expect(result.intent).toBe('add_stock');
+        (0, vitest_1.expect)(result.intent).toBe('add_stock');
     });
-    it('fallback: udhaar keywords', async () => {
+    (0, vitest_1.it)('fallback: udhaar keywords', async () => {
         const result = await runFallback('suresh ka udhaar batao');
-        expect(result.intent).toBe('check_udhaar');
+        (0, vitest_1.expect)(result.intent).toBe('check_udhaar');
     });
-    it('fallback: report keywords', async () => {
+    (0, vitest_1.it)('fallback: report keywords', async () => {
         const result = await runFallback('aaj ki report do');
-        expect(result.intent).toBe('view_report');
+        (0, vitest_1.expect)(result.intent).toBe('view_report');
     });
-    it('fallback: GST keywords', async () => {
+    (0, vitest_1.it)('fallback: GST keywords', async () => {
         const result = await runFallback('mera gst number check karo');
-        expect(result.intent).toBe('check_gst');
+        (0, vitest_1.expect)(result.intent).toBe('check_gst');
     });
-    it('fallback: help keywords', async () => {
+    (0, vitest_1.it)('fallback: help keywords', async () => {
         const result = await runFallback('kaise use karte hain');
-        expect(result.intent).toBe('help');
+        (0, vitest_1.expect)(result.intent).toBe('help');
     });
-    it('fallback: unknown input', async () => {
+    (0, vitest_1.it)('fallback: unknown input', async () => {
         const result = await runFallback('xyzwq mnbvc');
-        expect(result.intent).toBe('unknown');
-        expect(result.confidence).toBeLessThan(0.5);
+        (0, vitest_1.expect)(result.intent).toBe('unknown');
+        (0, vitest_1.expect)(result.confidence).toBeLessThan(0.5);
     });
 });
-describe('parseIntent (additional coverage)', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+(0, vitest_1.describe)('parseIntent (additional coverage)', () => {
+    (0, vitest_1.beforeEach)(() => {
+        vitest_1.vi.clearAllMocks();
         process.env.ANTHROPIC_API_KEY = 'test-key';
     });
-    it('handles send_reminder intent', async () => {
+    (0, vitest_1.it)('handles send_reminder intent', async () => {
         const result = await runWithMock('suresh ko payment reminder bhejo', {
             intent: 'send_reminder',
             confidence: 0.88,
@@ -206,10 +208,10 @@ describe('parseIntent (additional coverage)', () => {
             suggestedReply: 'Suresh ko reminder bhej du?',
             requiresConfirmation: true,
         });
-        expect(result.intent).toBe('send_reminder');
-        expect(result.entities.customer).toBe('suresh');
+        (0, vitest_1.expect)(result.intent).toBe('send_reminder');
+        (0, vitest_1.expect)(result.entities.customer).toBe('suresh');
     });
-    it('handles update_customer intent', async () => {
+    (0, vitest_1.it)('handles update_customer intent', async () => {
         const result = await runWithMock('naya customer Ramesh ka number add karo', {
             intent: 'update_customer',
             confidence: 0.85,
@@ -218,9 +220,9 @@ describe('parseIntent (additional coverage)', () => {
             suggestedReply: 'Ramesh ka number add kar du?',
             requiresConfirmation: true,
         });
-        expect(result.intent).toBe('update_customer');
+        (0, vitest_1.expect)(result.intent).toBe('update_customer');
     });
-    it('handles check_gst intent', async () => {
+    (0, vitest_1.it)('handles check_gst intent', async () => {
         const result = await runWithMock('₹5000 par GST kitna hoga', {
             intent: 'check_gst',
             confidence: 0.82,
@@ -229,9 +231,9 @@ describe('parseIntent (additional coverage)', () => {
             suggestedReply: '₹5000 par 5% GST = ₹250 hoga.',
             requiresConfirmation: false,
         });
-        expect(result.intent).toBe('check_gst');
+        (0, vitest_1.expect)(result.intent).toBe('check_gst');
     });
-    it('handles onboarding intent', async () => {
+    (0, vitest_1.it)('handles onboarding intent', async () => {
         const result = await runWithMock('mera business setup karo', {
             intent: 'onboarding',
             confidence: 0.9,
@@ -240,9 +242,9 @@ describe('parseIntent (additional coverage)', () => {
             suggestedReply: 'Aapke business ka naam kya hai?',
             requiresConfirmation: false,
         });
-        expect(result.intent).toBe('onboarding');
+        (0, vitest_1.expect)(result.intent).toBe('onboarding');
     });
-    it('handles help intent', async () => {
+    (0, vitest_1.it)('handles help intent', async () => {
         const result = await runWithMock('aap kya kar sakte hain', {
             intent: 'help',
             confidence: 0.87,
@@ -251,46 +253,46 @@ describe('parseIntent (additional coverage)', () => {
             suggestedReply: 'Main Hisab-Kitaab hoon! Aap mujhse invoice bhej sakte hain...',
             requiresConfirmation: false,
         });
-        expect(result.intent).toBe('help');
+        (0, vitest_1.expect)(result.intent).toBe('help');
     });
 });
-describe('parseIntent (edge cases)', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+(0, vitest_1.describe)('parseIntent (edge cases)', () => {
+    (0, vitest_1.beforeEach)(() => {
+        vitest_1.vi.clearAllMocks();
         process.env.ANTHROPIC_API_KEY = 'test-key';
     });
-    it('handles empty text via fallback', async () => {
+    (0, vitest_1.it)('handles empty text via fallback', async () => {
         const result = await runFallback('');
-        expect(result.intent).toBe('unknown');
-        expect(result.suggestedReply).toBeTruthy();
+        (0, vitest_1.expect)(result.intent).toBe('unknown');
+        (0, vitest_1.expect)(result.suggestedReply).toBeTruthy();
     });
-    it('handles non-JSON Claude response gracefully', async () => {
+    (0, vitest_1.it)('handles non-JSON Claude response gracefully', async () => {
         mockMessagesCreate.mockResolvedValueOnce({
             content: [{ type: 'text', text: 'Sorry, I could not process that.' }],
         });
-        const result = await parseIntent({ ...BASE_INPUT, text: 'hello' });
-        expect(result.intent).toBe('help');
+        const result = await (0, parse_intent_js_1.parseIntent)({ ...BASE_INPUT, text: 'hello' });
+        (0, vitest_1.expect)(result.intent).toBe('help');
     });
-    it('handles Claude response with embedded JSON', async () => {
+    (0, vitest_1.it)('handles Claude response with embedded JSON', async () => {
         mockMessagesCreate.mockResolvedValueOnce({
             content: [{
                     type: 'text',
                     text: 'Here is the parsed intent: {"intent": "view_report", "confidence": 0.9, "entities": {"period": "today"}, "missingFields": [], "suggestedReply": "Report ready", "requiresConfirmation": false}',
                 }],
         });
-        const result = await parseIntent({ ...BASE_INPUT, text: 'aaj ka hisab' });
-        expect(result.intent).toBe('view_report');
-        expect(result.entities.period).toBe('today');
+        const result = await (0, parse_intent_js_1.parseIntent)({ ...BASE_INPUT, text: 'aaj ka hisab' });
+        (0, vitest_1.expect)(result.intent).toBe('view_report');
+        (0, vitest_1.expect)(result.entities.period).toBe('today');
     });
-    it('fallback: subscription keywords', async () => {
+    (0, vitest_1.it)('fallback: subscription keywords', async () => {
         const result = await runFallback('mujhe premium plan lena hai');
-        expect(result.intent).toBe('subscription');
+        (0, vitest_1.expect)(result.intent).toBe('subscription');
     });
-    it('fallback: reconciliation keywords via bank SMS', async () => {
+    (0, vitest_1.it)('fallback: reconciliation keywords via bank SMS', async () => {
         const result = await runFallback('Rs 1,500 credited to your account from UPI');
-        expect(result.intent).toBe('reconciliation');
+        (0, vitest_1.expect)(result.intent).toBe('reconciliation');
     });
-    it('Claude: subscription intent', async () => {
+    (0, vitest_1.it)('Claude: subscription intent', async () => {
         const result = await runWithMock('vyapari plan kya hai', {
             intent: 'subscription',
             confidence: 0.91,
@@ -299,10 +301,10 @@ describe('parseIntent (edge cases)', () => {
             suggestedReply: 'Vyapari plan ₹499/month hai. Isme unlimited invoices aur stock management hai.',
             requiresConfirmation: false,
         });
-        expect(result.intent).toBe('subscription');
-        expect(result.entities.plan).toBe('vyapari');
+        (0, vitest_1.expect)(result.intent).toBe('subscription');
+        (0, vitest_1.expect)(result.entities.plan).toBe('vyapari');
     });
-    it('Claude: reconciliation intent', async () => {
+    (0, vitest_1.it)('Claude: reconciliation intent', async () => {
         const result = await runWithMock('UPI money credited 2000 from Ramesh', {
             intent: 'reconciliation',
             confidence: 0.87,
@@ -311,7 +313,7 @@ describe('parseIntent (edge cases)', () => {
             suggestedReply: 'Bank SMS receive hua. Payment reconcile kar raha hoon...',
             requiresConfirmation: false,
         });
-        expect(result.intent).toBe('reconciliation');
+        (0, vitest_1.expect)(result.intent).toBe('reconciliation');
     });
 });
 //# sourceMappingURL=parse-intent.test.js.map

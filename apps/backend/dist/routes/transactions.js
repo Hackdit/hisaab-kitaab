@@ -1,28 +1,31 @@
-import { z } from 'zod';
-const transactionCreateSchema = z.object({
-    business_id: z.string().uuid(),
-    type: z.enum(['payment_in', 'payment_out', 'udhaar', 'adjustment']),
-    amount: z.number().positive(),
-    description: z.string().optional(),
-    category: z.string().optional(),
-    payment_mode: z.enum(['upi', 'cash', 'bank', 'credit', 'other']).optional(),
-    customer_id: z.string().uuid().optional(),
-    invoice_id: z.string().uuid().optional(),
-    upi_reference: z.string().optional(),
-    notes: z.string().optional(),
-    transaction_date: z.string().optional(),
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.transactionRoutes = transactionRoutes;
+const zod_1 = require("zod");
+const transactionCreateSchema = zod_1.z.object({
+    business_id: zod_1.z.string().uuid(),
+    type: zod_1.z.enum(['payment_in', 'payment_out', 'udhaar', 'adjustment']),
+    amount: zod_1.z.number().positive(),
+    description: zod_1.z.string().optional(),
+    category: zod_1.z.string().optional(),
+    payment_mode: zod_1.z.enum(['upi', 'cash', 'bank', 'credit', 'other']).optional(),
+    customer_id: zod_1.z.string().uuid().optional(),
+    invoice_id: zod_1.z.string().uuid().optional(),
+    upi_reference: zod_1.z.string().optional(),
+    notes: zod_1.z.string().optional(),
+    transaction_date: zod_1.z.string().optional(),
 });
-const transactionUpdateSchema = z.object({
-    type: z.enum(['payment_in', 'payment_out', 'udhaar', 'adjustment']).optional(),
-    amount: z.number().positive().optional(),
-    description: z.string().optional(),
-    category: z.string().optional(),
-    payment_mode: z.enum(['upi', 'cash', 'bank', 'credit', 'other']).optional(),
-    upi_reference: z.string().optional(),
-    notes: z.string().optional(),
-    transaction_date: z.string().optional(),
+const transactionUpdateSchema = zod_1.z.object({
+    type: zod_1.z.enum(['payment_in', 'payment_out', 'udhaar', 'adjustment']).optional(),
+    amount: zod_1.z.number().positive().optional(),
+    description: zod_1.z.string().optional(),
+    category: zod_1.z.string().optional(),
+    payment_mode: zod_1.z.enum(['upi', 'cash', 'bank', 'credit', 'other']).optional(),
+    upi_reference: zod_1.z.string().optional(),
+    notes: zod_1.z.string().optional(),
+    transaction_date: zod_1.z.string().optional(),
 });
-export async function transactionRoutes(fastify) {
+async function transactionRoutes(fastify) {
     fastify.get('/', async (request, reply) => {
         try {
             const { data, error } = await fastify.supabase

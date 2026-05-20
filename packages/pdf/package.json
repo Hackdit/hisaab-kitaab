@@ -2,19 +2,8 @@
   "name": "@hisab-kitaab/pdf",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./invoice": {
-      "import": "./dist/invoice.js",
-      "types": "./dist/invoice.d.ts"
-    }
-  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit"

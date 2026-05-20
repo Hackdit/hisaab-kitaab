@@ -1,4 +1,7 @@
-export async function authenticate(request, reply) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.authenticate = authenticate;
+async function authenticate(request, reply) {
     try {
         const authHeader = request.headers.authorization;
         if (!authHeader?.startsWith('Bearer ')) {

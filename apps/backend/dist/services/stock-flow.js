@@ -1,6 +1,9 @@
-import { supabase } from '../plugins/supabase';
-import { sendTextMessage } from './whatsapp';
-export async function handleStockFlow(fromNumber, message, entities, currentState, business) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.handleStockFlow = handleStockFlow;
+const supabase_1 = require("../plugins/supabase");
+const whatsapp_1 = require("./whatsapp");
+async function handleStockFlow(fromNumber, message, entities, currentState, business) {
     const state = currentState || {};
     if (!state.stockFlow) {
         state.stockFlow = { lastUpdated: new Date().toISOString() };
@@ -16,7 +19,7 @@ export async function handleStockFlow(fromNumber, message, entities, currentStat
     }
     else {
         try {
-            const { data: existingItem } = await supabase
+            const { data: existingItem } = await supabase_1.supabase
                 .from('products')
                 .select('*')
                 .eq('business_id', business.id)
@@ -28,7 +31,7 @@ export async function handleStockFlow(fromNumber, message, entities, currentStat
                 if (type === 'out' && currentQty - quantity < 0) {
                     responseMessage = `Note: Stock can't go negative. Setting ${itemName} stock to 0. `;
                 }
-                await supabase
+                await supabase_1.supabase
                     .from('products')
                     .update({ stock_quantity: updatedQty })
                     .eq('id', existingItem.id);
@@ -36,7 +39,7 @@ export async function handleStockFlow(fromNumber, message, entities, currentStat
             }
             else {
                 // Create new product with stock
-                await supabase.from('products').insert({
+                await supabase_1.supabase.from('products').insert({
                     business_id: business.id,
                     name: itemName,
                     unit,
@@ -55,6 +58,6 @@ export async function handleStockFlow(fromNumber, message, entities, currentStat
                 'Maaf kijiye, stock update karne mein problem hui. Kripya dobara try karein.';
         }
     }
-    await sendTextMessage(fromNumber, responseMessage);
+    await (0, whatsapp_1.sendTextMessage)(fromNumber, responseMessage);
     return { state };
 }

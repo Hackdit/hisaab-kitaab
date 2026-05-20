@@ -1,3 +1,6 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.normalizeNumber = normalizeNumber;
 const HINDI_NUMBERS = {
     shunya: 0, zero: 0,
     ek: 1, one: 1,
@@ -119,7 +122,7 @@ function parseCompoundHindi(text) {
     }
     return null;
 }
-export function normalizeNumber(input) {
+function normalizeNumber(input) {
     if (typeof input !== 'string')
         return null;
     const trimmed = input.trim();

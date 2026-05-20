@@ -1,17 +1,20 @@
-import { z } from 'zod';
-const gstGenerateQuerySchema = z.object({
-    business_id: z.string().uuid(),
-    period: z.string().regex(/^\d{4}-\d{2}$/, 'Period must be in YYYY-MM format'),
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.gstRoutes = gstRoutes;
+const zod_1 = require("zod");
+const gstGenerateQuerySchema = zod_1.z.object({
+    business_id: zod_1.z.string().uuid(),
+    period: zod_1.z.string().regex(/^\d{4}-\d{2}$/, 'Period must be in YYYY-MM format'),
 });
-const gstFileSchema = z.object({
-    business_id: z.string().uuid(),
-    period: z.string().regex(/^\d{4}-\d{2}$/, 'Period must be in YYYY-MM format'),
-    gst_data: z.any(),
+const gstFileSchema = zod_1.z.object({
+    business_id: zod_1.z.string().uuid(),
+    period: zod_1.z.string().regex(/^\d{4}-\d{2}$/, 'Period must be in YYYY-MM format'),
+    gst_data: zod_1.z.any(),
 });
 function getMonthEnd(year, month) {
     return new Date(year, month, 0).toISOString().slice(0, 10);
 }
-export async function gstRoutes(fastify) {
+async function gstRoutes(fastify) {
     fastify.get('/generate', async (request, reply) => {
         const parsed = gstGenerateQuerySchema.safeParse(request.query);
         if (!parsed.success) {

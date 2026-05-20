@@ -1,20 +1,23 @@
-import { z } from 'zod';
-const customerCreateSchema = z.object({
-    business_id: z.string().uuid(),
-    name: z.string().min(1),
-    phone: z.string().optional(),
-    email: z.string().email().optional().or(z.literal('')),
-    address: z.string().optional(),
-    gstin: z.string().optional(),
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.customerRoutes = customerRoutes;
+const zod_1 = require("zod");
+const customerCreateSchema = zod_1.z.object({
+    business_id: zod_1.z.string().uuid(),
+    name: zod_1.z.string().min(1),
+    phone: zod_1.z.string().optional(),
+    email: zod_1.z.string().email().optional().or(zod_1.z.literal('')),
+    address: zod_1.z.string().optional(),
+    gstin: zod_1.z.string().optional(),
 });
-const customerUpdateSchema = z.object({
-    name: z.string().min(1).optional(),
-    phone: z.string().optional(),
-    email: z.string().email().optional().or(z.literal('')),
-    address: z.string().optional(),
-    gstin: z.string().optional(),
+const customerUpdateSchema = zod_1.z.object({
+    name: zod_1.z.string().min(1).optional(),
+    phone: zod_1.z.string().optional(),
+    email: zod_1.z.string().email().optional().or(zod_1.z.literal('')),
+    address: zod_1.z.string().optional(),
+    gstin: zod_1.z.string().optional(),
 });
-export async function customerRoutes(fastify) {
+async function customerRoutes(fastify) {
     fastify.get('/', async (request, reply) => {
         try {
             const businessId = request.query.business_id;

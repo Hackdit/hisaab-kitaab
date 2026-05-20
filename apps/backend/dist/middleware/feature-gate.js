@@ -1,4 +1,46 @@
-import { PLAN_NAMES } from '../services/razorpay';
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PLAN_FEATURES = exports.PLAN_LIMITS = exports.TRIAL_EXPIRED_MESSAGE = void 0;
+exports.checkFeatureAccess = checkFeatureAccess;
+exports.getPlanDisplayName = getPlanDisplayName;
+exports.getMonthlyInvoiceCount = getMonthlyInvoiceCount;
+exports.getCustomerCount = getCustomerCount;
+exports.checkInvoiceLimit = checkInvoiceLimit;
+exports.getPlanFeatures = getPlanFeatures;
+const razorpay_1 = require("../services/razorpay");
 // Feature access per plan
 const PLAN_FEATURES = {
     trial: new Set(['create_invoice', 'multi_language', 'client_management']),
@@ -35,6 +77,7 @@ const PLAN_FEATURES = {
         'client_management',
     ]),
 };
+exports.PLAN_FEATURES = PLAN_FEATURES;
 // Numeric limits per plan
 const PLAN_LIMITS = {
     trial: { invoicesPerMonth: 10, maxCustomers: 20, maxStaffAccounts: 0, maxClients: 1 },
@@ -44,6 +87,7 @@ const PLAN_LIMITS = {
     dhanda: { invoicesPerMonth: Infinity, maxCustomers: Infinity, maxStaffAccounts: 3, maxClients: 1 },
     ca: { invoicesPerMonth: Infinity, maxCustomers: Infinity, maxStaffAccounts: Infinity, maxClients: 50 },
 };
+exports.PLAN_LIMITS = PLAN_LIMITS;
 const LANGUAGE_LIMIT = {
     trial: 'Hindi only',
     trial_expired: 'Hindi only',
@@ -68,37 +112,37 @@ function getUpgradeLink(plan) {
     return `${process.env.FRONTEND_URL || 'https://hisab-kitaab.app'}/subscribe?plan=${plan}`;
 }
 const UPGRADE_MESSAGES = {
-    create_invoice: `Yeh feature ${PLAN_NAMES.chhota} plan mein available hai.\n` +
+    create_invoice: `Yeh feature ${razorpay_1.PLAN_NAMES.chhota} plan mein available hai.\n` +
         `Upgrade karein: `,
-    add_inventory: `Yeh feature ${PLAN_NAMES.vyapari} plan mein hai.\n` +
+    add_inventory: `Yeh feature ${razorpay_1.PLAN_NAMES.vyapari} plan mein hai.\n` +
         `Upgrade karein: `,
-    gst_filing: `GST filing ${PLAN_NAMES.vyapari} plan mein available hai.\n` +
+    gst_filing: `GST filing ${razorpay_1.PLAN_NAMES.vyapari} plan mein available hai.\n` +
         `Upgrade karein: `,
-    bulk_reminder: `Bulk reminders ${PLAN_NAMES.dhanda} plan mein available hain.\n` +
+    bulk_reminder: `Bulk reminders ${razorpay_1.PLAN_NAMES.dhanda} plan mein available hain.\n` +
         `Upgrade karein: `,
-    multi_language: `Multiple languages ${PLAN_NAMES.vyapari} plan mein available hain.\n` +
+    multi_language: `Multiple languages ${razorpay_1.PLAN_NAMES.vyapari} plan mein available hain.\n` +
         `Upgrade karein: `,
-    staff_whatsapp: `Staff WhatsApp numbers ${PLAN_NAMES.dhanda} plan mein available hain.\n` +
+    staff_whatsapp: `Staff WhatsApp numbers ${razorpay_1.PLAN_NAMES.dhanda} plan mein available hain.\n` +
         `Upgrade karein: `,
-    ondc: `ONDC integration ${PLAN_NAMES.dhanda} plan mein available hai.\n` +
+    ondc: `ONDC integration ${razorpay_1.PLAN_NAMES.dhanda} plan mein available hai.\n` +
         `Upgrade karein: `,
-    ca_portal: `CA portal access ${PLAN_NAMES.dhanda} plan mein available hai.\n` +
+    ca_portal: `CA portal access ${razorpay_1.PLAN_NAMES.dhanda} plan mein available hai.\n` +
         `Upgrade karein: `,
-    white_label: `White-label branding ${PLAN_NAMES.ca} plan mein available hai.\n` +
+    white_label: `White-label branding ${razorpay_1.PLAN_NAMES.ca} plan mein available hai.\n` +
         `Upgrade karein: `,
     client_management: `Multiple client management CA Partner plan (₹2499/mo) mein available hai.\n` +
         `Upgrade karein: `,
 };
-export const TRIAL_EXPIRED_MESSAGE = 'Aapka free trial khatam ho gaya hai. Hisab-Kitaab use karte rehne ke liye subscribe karein:\n' +
-    `• ${PLAN_NAMES.chhota}\n` +
-    `• ${PLAN_NAMES.vyapari}\n` +
-    `• ${PLAN_NAMES.dhanda}\n` +
+exports.TRIAL_EXPIRED_MESSAGE = 'Aapka free trial khatam ho gaya hai. Hisab-Kitaab use karte rehne ke liye subscribe karein:\n' +
+    `• ${razorpay_1.PLAN_NAMES.chhota}\n` +
+    `• ${razorpay_1.PLAN_NAMES.vyapari}\n` +
+    `• ${razorpay_1.PLAN_NAMES.dhanda}\n` +
     `Subscribe karein: ${getUpgradeLink('chhota')} wo/default`;
 /**
  * Check if a business has access to a specific feature.
  * Handles both feature-based gating and limit-based gating.
  */
-export async function checkFeatureAccess(business, feature) {
+async function checkFeatureAccess(business, feature) {
     const plan = (business.plan || 'trial');
     // If trial has expired, block all non-basic features
     if (plan === 'trial' && business.trial_ends_at) {
@@ -110,7 +154,7 @@ export async function checkFeatureAccess(business, feature) {
             }
             return {
                 allowed: false,
-                upgradeMessage: TRIAL_EXPIRED_MESSAGE,
+                upgradeMessage: exports.TRIAL_EXPIRED_MESSAGE,
                 upgradeLink: getUpgradeLink('chhota'),
             };
         }
@@ -139,7 +183,7 @@ export async function checkFeatureAccess(business, feature) {
 /**
  * Get the plan name in Hindi for display.
  */
-export function getPlanDisplayName(plan) {
+function getPlanDisplayName(plan) {
     switch (plan) {
         case 'trial':
             return 'Free Trial';
@@ -160,8 +204,8 @@ export function getPlanDisplayName(plan) {
 /**
  * Get current invoice count for a business this month.
  */
-export async function getMonthlyInvoiceCount(businessId) {
-    const { supabase } = await import('../plugins/supabase');
+async function getMonthlyInvoiceCount(businessId) {
+    const { supabase } = await Promise.resolve().then(() => __importStar(require('../plugins/supabase')));
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
@@ -179,8 +223,8 @@ export async function getMonthlyInvoiceCount(businessId) {
 /**
  * Get current customer count for a business.
  */
-export async function getCustomerCount(businessId) {
-    const { supabase } = await import('../plugins/supabase');
+async function getCustomerCount(businessId) {
+    const { supabase } = await Promise.resolve().then(() => __importStar(require('../plugins/supabase')));
     const { count, error } = await supabase
         .from('customers')
         .select('*', { count: 'exact', head: true })
@@ -194,7 +238,7 @@ export async function getCustomerCount(businessId) {
 /**
  * Check if a business has exceeded their plan's invoice limit for the month.
  */
-export async function checkInvoiceLimit(business) {
+async function checkInvoiceLimit(business) {
     const plan = (business.plan || 'trial');
     const limits = PLAN_LIMITS[plan];
     if (limits.invoicesPerMonth === Infinity) {
@@ -215,7 +259,6 @@ export async function checkInvoiceLimit(business) {
 /**
  * Get the feature set available for a plan (exported for NLP context).
  */
-export function getPlanFeatures(plan) {
+function getPlanFeatures(plan) {
     return Array.from(PLAN_FEATURES[plan] || []);
 }
-export { PLAN_LIMITS, PLAN_FEATURES };

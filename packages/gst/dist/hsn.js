@@ -1,3 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.DEFAULT_GST_RATE = void 0;
+exports.lookupHSN = lookupHSN;
+exports.getGSTRateByHSN = getGSTRateByHSN;
+exports.searchHSN = searchHSN;
+exports.isExemptGood = isExemptGood;
+exports.isValidStateCode = isValidStateCode;
 // Top 100+ HSN codes relevant to Indian MSMEs
 const HSN_TABLE = [
     // Food & Agriculture (0% / 5%)
@@ -167,26 +175,26 @@ const HSN_TABLE = [
 ];
 const HSN_MAP = new Map(HSN_TABLE.map(e => [e.hsnCode, e]));
 /** Default GST rate when HSN code is not found */
-export const DEFAULT_GST_RATE = 18;
+exports.DEFAULT_GST_RATE = 18;
 /**
  * Look up an HSN code and return its entry (description + GST rate).
  * Returns `undefined` if the code is not in the table.
  */
-export function lookupHSN(hsnCode) {
+function lookupHSN(hsnCode) {
     return HSN_MAP.get(hsnCode.trim());
 }
 /**
  * Get the GST rate for a given HSN code.
  * Falls back to 18% (default rate) if not found.
  */
-export function getGSTRateByHSN(hsnCode) {
-    return lookupHSN(hsnCode)?.gstRate ?? DEFAULT_GST_RATE;
+function getGSTRateByHSN(hsnCode) {
+    return lookupHSN(hsnCode)?.gstRate ?? exports.DEFAULT_GST_RATE;
 }
 /**
  * Fuzzy search HSN codes by product name or description keyword.
  * Returns up to `limit` matches.
  */
-export function searchHSN(keyword, limit = 5) {
+function searchHSN(keyword, limit = 5) {
     const lower = keyword.toLowerCase();
     const direct = HSN_TABLE.filter(e => e.hsnCode === keyword || e.description.toLowerCase().includes(lower));
     // Boost exact HSN matches, then sort by relevance
@@ -212,13 +220,13 @@ const EXEMPT_HSN_CODES = new Set([
 /**
  * Check if an HSN code corresponds to an exempt good (0% GST).
  */
-export function isExemptGood(hsnCode) {
+function isExemptGood(hsnCode) {
     return EXEMPT_HSN_CODES.has(hsnCode.trim());
 }
 /**
  * Validate Indian state code (2-letter code).
  */
-export function isValidStateCode(code) {
+function isValidStateCode(code) {
     const valid = new Set([
         'AN', 'AP', 'AR', 'AS', 'BR', 'CG', 'CH', 'DD', 'DL', 'DN',
         'GA', 'GJ', 'HP', 'HR', 'JH', 'JK', 'KA', 'KL', 'LA', 'LD',

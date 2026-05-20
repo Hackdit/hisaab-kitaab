@@ -1,3 +1,8 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.calculateGST = calculateGST;
+exports.amountInWords = amountInWords;
+exports.validateGSTIN = validateGSTIN;
 /**
  * Round a number to 2 decimal places (standard for currency).
  * Uses bankers' rounding via toFixed which rounds half-up.
@@ -58,7 +63,7 @@ function calculateLineItemTax(item, index, isInterstate) {
  * @param isComposition  If true, applies flat 1% composition levy
  *                       (no CGST/SGST/IGST split — total tax = 1% of subtotal)
  */
-export function calculateGST(items, sellerState, buyerState, isComposition = false) {
+function calculateGST(items, sellerState, buyerState, isComposition = false) {
     const isInterstate = sellerState.toUpperCase() !== buyerState.toUpperCase();
     const breakdown = items.map((item, i) => calculateLineItemTax(item, i, isInterstate));
     const subtotal = round2(breakdown.reduce((sum, b) => sum + b.taxableAmount, 0));
@@ -124,7 +129,7 @@ export function calculateGST(items, sellerState, buyerState, isComposition = fal
  *
  * Example: 522 → "Rupees Five Hundred Twenty Two Only"
  */
-export function amountInWords(amount) {
+function amountInWords(amount) {
     if (amount === 0)
         return 'Rupees Zero Only';
     const whole = Math.floor(Math.abs(amount));
@@ -186,7 +191,7 @@ export function amountInWords(amount) {
  * Validate a GSTIN (15-character format).
  * Returns `true` if the GSTIN format is valid.
  */
-export function validateGSTIN(gstin) {
+function validateGSTIN(gstin) {
     const clean = gstin.trim().toUpperCase();
     if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z][Z][0-9A-Z]$/.test(clean)) {
         return false;

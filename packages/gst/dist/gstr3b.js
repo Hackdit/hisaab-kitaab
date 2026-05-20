@@ -1,3 +1,8 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.generateGSTR3B = generateGSTR3B;
+exports.computeOutwardSupply = computeOutwardSupply;
+exports.computeITC = computeITC;
 /**
  * Generate GSTR-3B data from outward supplies and ITC.
  *
@@ -11,13 +16,13 @@
  * @param itc       Eligible and claimed ITC
  * @param interest  Late fee and interest payable
  */
-export function generateGSTR3B(gstin, fp, outward, itc, interest) {
+function generateGSTR3B(gstin, fp, outward, itc, interest) {
     return { gstin, fp, outward, itc, interest };
 }
 /**
  * Compute outward supply summary from a list of taxable amounts and tax paid.
  */
-export function computeOutwardSupply(invoices) {
+function computeOutwardSupply(invoices) {
     return {
         taxable: invoices.reduce((s, inv) => s + inv.taxableAmount, 0),
         tax: invoices.reduce((s, inv) => s + inv.totalTax, 0),
@@ -26,7 +31,7 @@ export function computeOutwardSupply(invoices) {
 /**
  * Compute ITC summary from purchase invoices.
  */
-export function computeITC(purchases) {
+function computeITC(purchases) {
     return {
         eligible: purchases.reduce((s, p) => s + p.eligible, 0),
         claimed: purchases.reduce((s, p) => s + p.claimed, 0),

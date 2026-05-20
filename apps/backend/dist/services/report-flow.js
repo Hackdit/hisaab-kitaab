@@ -1,6 +1,9 @@
-import { supabase } from '../plugins/supabase';
-import { sendTextMessage } from './whatsapp';
-export async function handleReportFlow(fromNumber, currentState, business) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.handleReportFlow = handleReportFlow;
+const supabase_1 = require("../plugins/supabase");
+const whatsapp_1 = require("./whatsapp");
+async function handleReportFlow(fromNumber, currentState, business) {
     const state = currentState || {};
     if (!state.reportFlow) {
         state.reportFlow = { lastReportRequested: new Date().toISOString() };
@@ -14,7 +17,7 @@ export async function handleReportFlow(fromNumber, currentState, business) {
         todayEnd.setHours(23, 59, 59, 999);
         const todayEndISO = todayEnd.toISOString();
         // Today's sales
-        const { data: invoices } = await supabase
+        const { data: invoices } = await supabase_1.supabase
             .from('invoices')
             .select('total, status')
             .eq('business_id', business.id)
@@ -22,7 +25,7 @@ export async function handleReportFlow(fromNumber, currentState, business) {
             .lte('created_at', todayEndISO);
         const todaySalesTotal = (invoices || []).reduce((sum, inv) => sum + (inv.total || 0), 0);
         // Pending udhaar (unpaid/partial invoices)
-        const { data: pendingInvoices } = await supabase
+        const { data: pendingInvoices } = await supabase_1.supabase
             .from('invoices')
             .select('id, total, payment_received, status')
             .eq('business_id', business.id)
@@ -32,7 +35,7 @@ export async function handleReportFlow(fromNumber, currentState, business) {
             return sum + Math.max(0, (inv.total || 0) - paid);
         }, 0);
         // Low stock items
-        const { data: products } = await supabase
+        const { data: products } = await supabase_1.supabase
             .from('products')
             .select('name, stock_quantity, low_stock_alert_at, unit')
             .eq('business_id', business.id);
@@ -55,7 +58,7 @@ export async function handleReportFlow(fromNumber, currentState, business) {
         responseMessage =
             'Maaf kijiye, report generate karne mein problem hui. Kripya dobara try karein.';
     }
-    await sendTextMessage(fromNumber, responseMessage);
+    await (0, whatsapp_1.sendTextMessage)(fromNumber, responseMessage);
     state.reportFlow.lastReportRequested = new Date().toISOString();
     return { state };
 }

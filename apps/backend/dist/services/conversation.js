@@ -1,12 +1,19 @@
-import { supabase } from '../plugins/supabase';
-import { redis } from '../plugins/redis';
-import { sendTextMessage } from './whatsapp';
-import { scheduleTrialNudges, scheduleTrialExpiry } from './trial-jobs';
-export const STATE_TTL = 60 * 60 * 24; // 24 hours
-export function initializeState() {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.STATE_TTL = void 0;
+exports.initializeState = initializeState;
+exports.handleOnboarding = handleOnboarding;
+exports.getState = getState;
+exports.saveState = saveState;
+const supabase_1 = require("../plugins/supabase");
+const redis_1 = require("../plugins/redis");
+const whatsapp_1 = require("./whatsapp");
+const trial_jobs_1 = require("./trial-jobs");
+exports.STATE_TTL = 60 * 60 * 24; // 24 hours
+function initializeState() {
     return { step: 'start' };
 }
-export async function handleOnboarding(fromNumber, message, currentState, skipMessage) {
+async function handleOnboarding(fromNumber, message, currentState, skipMessage) {
     let state = currentState ?? initializeState();
     let responseMessage = '';
     switch (state.step) {
@@ -39,7 +46,7 @@ export async function handleOnboarding(fromNumber, message, currentState, skipMe
             }
             state.step = 'complete';
             try {
-                const { data: business, error } = await supabase
+                const { data: business, error } = await supabase_1.supabase
                     .from('businesses')
                     .insert({
                     business_name: state.businessName,
@@ -53,15 +60,15 @@ export async function handleOnboarding(fromNumber, message, currentState, skipMe
                 // Schedule trial nudges for day 7 and day 12
                 if (business.trial_ends_at) {
                     try {
-                        await scheduleTrialNudges(business.id, business.trial_ends_at);
-                        await scheduleTrialExpiry(business.id, business.trial_ends_at);
+                        await (0, trial_jobs_1.scheduleTrialNudges)(business.id, business.trial_ends_at);
+                        await (0, trial_jobs_1.scheduleTrialExpiry)(business.id, business.trial_ends_at);
                     }
                     catch (schedError) {
                         console.error('Error scheduling trial jobs:', schedError);
                     }
                 }
                 // Also create the business owner as a customer entry
-                await supabase.from('customers').insert({
+                await supabase_1.supabase.from('customers').insert({
                     business_id: business.id,
                     business_name: state.businessName,
                     whatsapp_number: fromNumber,
@@ -88,11 +95,11 @@ export async function handleOnboarding(fromNumber, message, currentState, skipMe
     const stateKey = `whatsapp:state:${fromNumber}`;
     console.log('REDIS KEY WRITE:', `whatsapp:state:${fromNumber}`);
     console.log('REDIS VALUE:', JSON.stringify(state));
-    await redis.set(stateKey, state, { ex: STATE_TTL });
+    await redis_1.redis.set(stateKey, state, { ex: exports.STATE_TTL });
     // Try to send WhatsApp message — never throw, state is already saved
     if (!skipMessage) {
         try {
-            await sendTextMessage(fromNumber, responseMessage);
+            await (0, whatsapp_1.sendTextMessage)(fromNumber, responseMessage);
         }
         catch (msgError) {
             console.error('Error sending WhatsApp message:', msgError);
@@ -100,11 +107,11 @@ export async function handleOnboarding(fromNumber, message, currentState, skipMe
     }
     return { state };
 }
-export async function getState(fromNumber) {
+async function getState(fromNumber) {
     try {
         const stateKey = `whatsapp:state:${fromNumber}`;
         console.log('REDIS KEY GET:', stateKey);
-        const stateValue = await redis.get(stateKey);
+        const stateValue = await redis_1.redis.get(stateKey);
         console.log('REDIS GET RESULT:', stateValue);
         if (!stateValue)
             return null;
@@ -119,7 +126,7 @@ export async function getState(fromNumber) {
         return null;
     }
 }
-export async function saveState(fromNumber, state) {
+async function saveState(fromNumber, state) {
     const stateKey = `whatsapp:state:${fromNumber}`;
-    await redis.set(stateKey, state, { ex: STATE_TTL });
+    await redis_1.redis.set(stateKey, state, { ex: exports.STATE_TTL });
 }

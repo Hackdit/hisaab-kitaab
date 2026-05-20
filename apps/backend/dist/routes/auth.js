@@ -1,18 +1,21 @@
-import { z } from 'zod';
-import { supabase } from '../plugins/supabase';
-import { sendTextMessage } from '../services/whatsapp';
-const otpRequestSchema = z.object({
-    phone: z.string().regex(/^\+?[1-9]\d{9,14}$/, 'Invalid phone number'),
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.authRoutes = authRoutes;
+const zod_1 = require("zod");
+const supabase_1 = require("../plugins/supabase");
+const whatsapp_1 = require("../services/whatsapp");
+const otpRequestSchema = zod_1.z.object({
+    phone: zod_1.z.string().regex(/^\+?[1-9]\d{9,14}$/, 'Invalid phone number'),
 });
-const otpVerifySchema = z.object({
-    phone: z.string().regex(/^\+?[1-9]\d{9,14}$/, 'Invalid phone number'),
-    otp: z.string().length(6, 'OTP must be 6 digits'),
+const otpVerifySchema = zod_1.z.object({
+    phone: zod_1.z.string().regex(/^\+?[1-9]\d{9,14}$/, 'Invalid phone number'),
+    otp: zod_1.z.string().length(6, 'OTP must be 6 digits'),
 });
 const otpStore = new Map();
 function generateOtp() {
     return Math.floor(100000 + Math.random() * 900000).toString();
 }
-export async function authRoutes(fastify) {
+async function authRoutes(fastify) {
     fastify.post('/otp', async (request, reply) => {
         const parsed = otpRequestSchema.safeParse(request.body);
         if (!parsed.success) {
@@ -22,7 +25,7 @@ export async function authRoutes(fastify) {
         const otp = generateOtp();
         otpStore.set(phone, { otp, expiresAt: Date.now() + 5 * 60 * 1000 });
         try {
-            await sendTextMessage(phone, `Your Hisab-Kitaab OTP is: ${otp}. Valid for 5 minutes.`);
+            await (0, whatsapp_1.sendTextMessage)(phone, `Your Hisab-Kitaab OTP is: ${otp}. Valid for 5 minutes.`);
             return reply.send({ message: 'OTP sent successfully' });
         }
         catch (error) {
@@ -49,14 +52,14 @@ export async function authRoutes(fastify) {
         }
         otpStore.delete(phone);
         // Create or sign in Supabase user
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        const { data: authData, error: authError } = await supabase_1.supabase.auth.admin.createUser({
             phone,
             phone_confirm: true,
         });
         if (authError) {
             if (authError.message.includes('already exists')) {
                 // User exists — sign them in
-                const { data: signInData, error: signInError } = await supabase.auth.signInWithOtp({ phone });
+                const { data: signInData, error: signInError } = await supabase_1.supabase.auth.signInWithOtp({ phone });
                 if (signInError) {
                     return reply.status(500).send({ error: 'Authentication failed' });
                 }

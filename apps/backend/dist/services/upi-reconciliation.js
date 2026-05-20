@@ -1,5 +1,44 @@
-import { supabase } from '../plugins/supabase';
-import { sendTextMessage } from './whatsapp';
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.parseBankSms = parseBankSms;
+exports.matchToInvoice = matchToInvoice;
+exports.reconcilePayment = reconcilePayment;
+exports.looksLikeBankSms = looksLikeBankSms;
+const supabase_1 = require("../plugins/supabase");
+const whatsapp_1 = require("./whatsapp");
 // Regex patterns for Indian bank UPI credit SMS
 // Formats vary by bank but common patterns:
 // "A/c XX1234 credited with Rs.850 on 09-05-26 by UPI-Ramesh"
@@ -21,7 +60,7 @@ const UPI_SMS_PATTERNS = [
  * Parse a forwarded bank SMS to extract payment details.
  * Returns null if the message doesn't look like a UPI credit SMS.
  */
-export function parseBankSms(text) {
+function parseBankSms(text) {
     let amount = null;
     let payerName;
     let upiReference;
@@ -91,9 +130,9 @@ export function parseBankSms(text) {
  * Match a payment to an open invoice for a business.
  * Tries exact name match first, then falls back to amount-only matching.
  */
-export async function matchToInvoice(businessId, amount, payerName) {
+async function matchToInvoice(businessId, amount, payerName) {
     // Try to find unpaid invoices for this customer
-    const { data: unpaidInvoices, error } = await supabase
+    const { data: unpaidInvoices, error } = await supabase_1.supabase
         .from('invoices')
         .select('*, customers!inner(name)')
         .eq('business_id', businessId)
@@ -170,7 +209,7 @@ export async function matchToInvoice(businessId, amount, payerName) {
  * 2. Match to invoice
  * 3. Auto-mark paid or ask for clarification
  */
-export async function reconcilePayment(fromNumber, businessId, smsText) {
+async function reconcilePayment(fromNumber, businessId, smsText) {
     // Step 1: Parse the SMS
     const parsed = parseBankSms(smsText);
     if (!parsed) {
@@ -188,7 +227,7 @@ export async function reconcilePayment(fromNumber, businessId, smsText) {
         const receivedSoFar = invoice.payment_received || 0;
         const newReceived = receivedSoFar + amount;
         const newStatus = newReceived >= (invoice.total || 0) ? 'paid' : 'partial';
-        await supabase
+        await supabase_1.supabase
             .from('invoices')
             .update({
             status: newStatus,
@@ -197,7 +236,7 @@ export async function reconcilePayment(fromNumber, businessId, smsText) {
         })
             .eq('id', invoice.id);
         // Log the transaction
-        const { supabase: db } = await import('../plugins/supabase');
+        const { supabase: db } = await Promise.resolve().then(() => __importStar(require('../plugins/supabase')));
         await db.from('transactions').insert({
             business_id: businessId,
             invoice_id: invoice.id,
@@ -208,20 +247,20 @@ export async function reconcilePayment(fromNumber, businessId, smsText) {
             upi_reference: parsed.upiReference || null,
             notes: `UPI auto-reconciled from SMS`,
         });
-        await sendTextMessage(fromNumber, `₹${amount} receive hua ${payerName || 'kisi'} se ✅\n` +
+        await (0, whatsapp_1.sendTextMessage)(fromNumber, `₹${amount} receive hua ${payerName || 'kisi'} se ✅\n` +
             `Invoice #${invoice.invoice_number || ''} marked as ${newStatus}.\n` +
             `Baaki amount: ₹${Math.max(0, (invoice.total || 0) - newReceived)}`);
         return { reconciled: true, message: `Payment reconciled for invoice ${invoice.id}` };
     }
     // Step 4: No match - send clarification message from matchResult
-    await sendTextMessage(fromNumber, matchResult.message);
+    await (0, whatsapp_1.sendTextMessage)(fromNumber, matchResult.message);
     return { reconciled: false, message: matchResult.message };
 }
 /**
  * Quick check if a text looks like a forwarded bank SMS.
  * Used to route messages to UPI reconciliation vs regular payment flow.
  */
-export function looksLikeBankSms(text) {
+function looksLikeBankSms(text) {
     const indicators = [
         /credited/i,
         /ac\s+xx\d+/i,

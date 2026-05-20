@@ -1,7 +1,19 @@
-import { supabase } from '../plugins/supabase';
-import { sendTextMessage } from './whatsapp';
-import { createRazorpayCustomer, createSubscription, generatePaymentLink, PLAN_IDS, PLAN_PRICES, PLAN_NAMES, } from './razorpay';
-export const TRIAL_DAYS = 14;
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.TRIAL_DAYS = void 0;
+exports.initiateSubscription = initiateSubscription;
+exports.activateSubscription = activateSubscription;
+exports.cancelSubscription = cancelSubscription;
+exports.handlePaymentFailed = handlePaymentFailed;
+exports.logPaymentTransaction = logPaymentTransaction;
+exports.getTrialStatus = getTrialStatus;
+exports.sendTrialNudge = sendTrialNudge;
+exports.downgradeExpiredTrials = downgradeExpiredTrials;
+exports.handleSubscribeIntent = handleSubscribeIntent;
+const supabase_1 = require("../plugins/supabase");
+const whatsapp_1 = require("./whatsapp");
+const razorpay_1 = require("./razorpay");
+exports.TRIAL_DAYS = 14;
 /**
  * Initiate a full subscription flow for a business:
  * 1. Create Razorpay customer
@@ -10,35 +22,35 @@ export const TRIAL_DAYS = 14;
  * 4. Save to DB
  * 5. Send payment link on WhatsApp
  */
-export async function initiateSubscription(businessId, plan, whatsappNumber, businessName) {
+async function initiateSubscription(businessId, plan, whatsappNumber, businessName) {
     try {
         // Get or create Razorpay customer
-        const { data: business } = await supabase
+        const { data: business } = await supabase_1.supabase
             .from('businesses')
             .select('razorpay_customer_id, name')
             .eq('id', businessId)
             .single();
         let customerId = business?.razorpay_customer_id;
         if (!customerId) {
-            const customer = await createRazorpayCustomer(whatsappNumber, businessName);
+            const customer = await (0, razorpay_1.createRazorpayCustomer)(whatsappNumber, businessName);
             customerId = customer.id;
             // Save customer ID to DB
-            await supabase
+            await supabase_1.supabase
                 .from('businesses')
                 .update({ razorpay_customer_id: customerId })
                 .eq('id', businessId);
         }
         // Create subscription in Razorpay
-        const planId = PLAN_IDS[plan];
+        const planId = razorpay_1.PLAN_IDS[plan];
         if (!planId) {
             return { success: false, error: `Invalid plan: ${plan}` };
         }
-        const subscription = await createSubscription(customerId, planId);
+        const subscription = await (0, razorpay_1.createSubscription)(customerId, planId);
         // Generate payment link
-        const amount = PLAN_PRICES[plan];
-        const paymentLink = await generatePaymentLink(subscription.id, amount, `Hisab-Kitaab ${PLAN_NAMES[plan]} Subscription`);
+        const amount = razorpay_1.PLAN_PRICES[plan];
+        const paymentLink = await (0, razorpay_1.generatePaymentLink)(subscription.id, amount, `Hisab-Kitaab ${razorpay_1.PLAN_NAMES[plan]} Subscription`);
         // Save payment link to DB
-        await supabase.from('payment_links').insert({
+        await supabase_1.supabase.from('payment_links').insert({
             business_id: businessId,
             subscription_id: subscription.id,
             razorpay_link_id: paymentLink.id,
@@ -47,17 +59,17 @@ export async function initiateSubscription(businessId, plan, whatsappNumber, bus
             status: 'created',
         });
         // Update business with subscription ID
-        await supabase
+        await supabase_1.supabase
             .from('businesses')
             .update({ razorpay_subscription_id: subscription.id })
             .eq('id', businessId);
         // Send payment link on WhatsApp
         if (paymentLink.short_url) {
-            const planName = PLAN_NAMES[plan];
+            const planName = razorpay_1.PLAN_NAMES[plan];
             const message = `Aapne ${planName} select kiya hai. ✅\n\n` +
                 `Payment link generate ho gaya hai:\n${paymentLink.short_url}\n\n` +
                 `Link par click karke payment complete karein. Payment confirm hote hi aapka plan activate ho jayega.`;
-            await sendTextMessage(whatsappNumber, message);
+            await (0, whatsapp_1.sendTextMessage)(whatsappNumber, message);
         }
         return { success: true, shortUrl: paymentLink.short_url };
     }
@@ -70,17 +82,17 @@ export async function initiateSubscription(businessId, plan, whatsappNumber, bus
  * Activate a subscription after successful payment.
  * Called from Razorpay webhook handler.
  */
-export async function activateSubscription(subscriptionId) {
+async function activateSubscription(subscriptionId) {
     try {
         // Find business by subscription ID
-        const { data: business } = await supabase
+        const { data: business } = await supabase_1.supabase
             .from('businesses')
             .select('id, whatsapp_number, plan')
             .eq('razorpay_subscription_id', subscriptionId)
             .single();
         if (!business) {
             // Try finding by payment link subscription ID
-            const { data: paymentLink } = await supabase
+            const { data: paymentLink } = await supabase_1.supabase
                 .from('payment_links')
                 .select('business_id')
                 .eq('subscription_id', subscriptionId)
@@ -90,7 +102,7 @@ export async function activateSubscription(subscriptionId) {
                 return { success: false };
             }
             // Determine plan from payment link amount
-            const { data: linkData } = await supabase
+            const { data: linkData } = await supabase_1.supabase
                 .from('payment_links')
                 .select('amount')
                 .eq('subscription_id', subscriptionId)
@@ -106,7 +118,7 @@ export async function activateSubscription(subscriptionId) {
                 else if (amount >= 599)
                     targetPlan = 'vyapari';
             }
-            await supabase
+            await supabase_1.supabase
                 .from('businesses')
                 .update({
                 plan: targetPlan,
@@ -115,25 +127,25 @@ export async function activateSubscription(subscriptionId) {
             })
                 .eq('id', paymentLink.business_id);
             // Update payment link status
-            await supabase
+            await supabase_1.supabase
                 .from('payment_links')
                 .update({ status: 'paid', paid_at: new Date().toISOString() })
                 .eq('subscription_id', subscriptionId);
             // Notify business
-            const { data: updated } = await supabase
+            const { data: updated } = await supabase_1.supabase
                 .from('businesses')
                 .select('whatsapp_number')
                 .eq('id', paymentLink.business_id)
                 .single();
             if (updated?.whatsapp_number) {
-                await sendTextMessage(updated.whatsapp_number, `Aapka plan activate ho gaya hai! ✅\nAb Hisab-Kitaab ke saare features use kar sakte hain.`);
+                await (0, whatsapp_1.sendTextMessage)(updated.whatsapp_number, `Aapka plan activate ho gaya hai! ✅\nAb Hisab-Kitaab ke saare features use kar sakte hain.`);
             }
             return { success: true, businessId: paymentLink.business_id };
         }
         // Determine plan from Razorpay subscription plan_id
         // For now, use the existing plan or default to chhota
         const currentPlan = business.plan || 'chhota';
-        await supabase
+        await supabase_1.supabase
             .from('businesses')
             .update({
             plan: currentPlan,
@@ -141,12 +153,12 @@ export async function activateSubscription(subscriptionId) {
         })
             .eq('id', business.id);
         // Update payment link status
-        await supabase
+        await supabase_1.supabase
             .from('payment_links')
             .update({ status: 'paid', paid_at: new Date().toISOString() })
             .eq('subscription_id', subscriptionId);
         // Notify business
-        await sendTextMessage(business.whatsapp_number, `Aapka plan activate ho gaya hai! ✅\nAb Hisab-Kitaab ke saare features use kar sakte hain.`);
+        await (0, whatsapp_1.sendTextMessage)(business.whatsapp_number, `Aapka plan activate ho gaya hai! ✅\nAb Hisab-Kitaab ke saare features use kar sakte hain.`);
         return { success: true, businessId: business.id };
     }
     catch (error) {
@@ -158,9 +170,9 @@ export async function activateSubscription(subscriptionId) {
  * Handle subscription cancellation gracefully.
  * Downgrades to trial_expired but does NOT delete data.
  */
-export async function cancelSubscription(subscriptionId) {
+async function cancelSubscription(subscriptionId) {
     try {
-        const { data: business } = await supabase
+        const { data: business } = await supabase_1.supabase
             .from('businesses')
             .select('id, whatsapp_number')
             .eq('razorpay_subscription_id', subscriptionId)
@@ -170,11 +182,11 @@ export async function cancelSubscription(subscriptionId) {
             return false;
         }
         // Downgrade to trial_expired
-        await supabase
+        await supabase_1.supabase
             .from('businesses')
             .update({ plan: 'trial_expired', razorpay_subscription_id: null })
             .eq('id', business.id);
-        await sendTextMessage(business.whatsapp_number, `Aapka subscription cancel kar diya gaya hai.\n\n` +
+        await (0, whatsapp_1.sendTextMessage)(business.whatsapp_number, `Aapka subscription cancel kar diya gaya hai.\n\n` +
             `Aap Hisab-Kitaab ke basic features use karte rah sakte hain.\n` +
             `Phir se subscribe karne ke liye "subscribe" type karein.`);
         return true;
@@ -187,9 +199,9 @@ export async function cancelSubscription(subscriptionId) {
 /**
  * Handle failed payment notification.
  */
-export async function handlePaymentFailed(businessId, failureReason) {
+async function handlePaymentFailed(businessId, failureReason) {
     try {
-        const { data: business } = await supabase
+        const { data: business } = await supabase_1.supabase
             .from('businesses')
             .select('whatsapp_number')
             .eq('id', businessId)
@@ -201,7 +213,7 @@ export async function handlePaymentFailed(businessId, failureReason) {
         if (failureReason) {
             message = `Payment fail ho gaya. Reason: ${failureReason}\n\nKripya dobara try karein ya kisi aur card/UPI se payment karein.`;
         }
-        await sendTextMessage(business.whatsapp_number, message);
+        await (0, whatsapp_1.sendTextMessage)(business.whatsapp_number, message);
     }
     catch (error) {
         console.error('Error handling payment failure:', error);
@@ -210,8 +222,8 @@ export async function handlePaymentFailed(businessId, failureReason) {
 /**
  * Log a successful payment transaction from webhook.
  */
-export async function logPaymentTransaction(params) {
-    await supabase.from('payment_transactions').insert({
+async function logPaymentTransaction(params) {
+    await supabase_1.supabase.from('payment_transactions').insert({
         business_id: params.businessId,
         invoice_id: params.invoiceId || null,
         razorpay_payment_id: params.razorpayPaymentId,
@@ -227,7 +239,7 @@ export async function logPaymentTransaction(params) {
 /**
  * Get trial status for a business.
  */
-export function getTrialStatus(business) {
+function getTrialStatus(business) {
     if (business.plan !== 'trial' || !business.trial_ends_at) {
         return { isActive: false, daysRemaining: 0, isExpired: business.plan === 'trial_expired' };
     }
@@ -246,15 +258,15 @@ export function getTrialStatus(business) {
  * Day 7: "7 din baaki hain free trial mein"
  * Day 12: "2 din baaki — aaj hi subscribe karein"
  */
-export async function sendTrialNudge(whatsappNumber, daysLeft) {
+async function sendTrialNudge(whatsappNumber, daysLeft) {
     let message;
     if (daysLeft <= 2) {
         message =
             `Sirf ${daysLeft} din baaki hain aapke free trial mein! ⏰\n\n` +
                 `Aaj hi subscribe karein:\n` +
-                `• ${PLAN_NAMES.chhota}\n` +
-                `• ${PLAN_NAMES.vyapari}\n` +
-                `• ${PLAN_NAMES.dhanda}\n\n` +
+                `• ${razorpay_1.PLAN_NAMES.chhota}\n` +
+                `• ${razorpay_1.PLAN_NAMES.vyapari}\n` +
+                `• ${razorpay_1.PLAN_NAMES.dhanda}\n\n` +
                 `Subscribe karne ke liye "subscribe" type karein.`;
     }
     else {
@@ -263,15 +275,15 @@ export async function sendTrialNudge(whatsappNumber, daysLeft) {
                 `Hisab-Kitaap aapko pasand aa raha hai?\n` +
                 `Subscription plans check karne ke liye "plans" type karein.`;
     }
-    await sendTextMessage(whatsappNumber, message);
+    await (0, whatsapp_1.sendTextMessage)(whatsappNumber, message);
 }
 /**
  * Downgrade all businesses with expired trials to trial_expired.
  * Should be called daily by a cron job.
  */
-export async function downgradeExpiredTrials() {
+async function downgradeExpiredTrials() {
     const now = new Date().toISOString();
-    const { data: expiredBusinesses, error } = await supabase
+    const { data: expiredBusinesses, error } = await supabase_1.supabase
         .from('businesses')
         .select('id, whatsapp_number')
         .eq('plan', 'trial')
@@ -281,16 +293,16 @@ export async function downgradeExpiredTrials() {
         return 0;
     }
     for (const business of expiredBusinesses) {
-        await supabase
+        await supabase_1.supabase
             .from('businesses')
             .update({ plan: 'trial_expired' })
             .eq('id', business.id);
         // Send trial expiry notification
-        await sendTextMessage(business.whatsapp_number, `Aapka free trial aaj khatam ho raha hai!\n` +
+        await (0, whatsapp_1.sendTextMessage)(business.whatsapp_number, `Aapka free trial aaj khatam ho raha hai!\n` +
             `Hisab-Kitaab use karte rehne ke liye subscribe karein:\n` +
-            `• ${PLAN_NAMES.chhota}\n` +
-            `• ${PLAN_NAMES.vyapari}\n` +
-            `• ${PLAN_NAMES.dhanda}\n` +
+            `• ${razorpay_1.PLAN_NAMES.chhota}\n` +
+            `• ${razorpay_1.PLAN_NAMES.vyapari}\n` +
+            `• ${razorpay_1.PLAN_NAMES.dhanda}\n` +
             `Subscribe karein: ${process.env.FRONTEND_URL || 'https://hisab-kitaab.app'}/subscribe`);
     }
     return expiredBusinesses.length;
@@ -299,31 +311,31 @@ export async function downgradeExpiredTrials() {
  * Handle 'subscribe' intent from WhatsApp.
  * Shows plan options or processes a specific plan selection.
  */
-export async function handleSubscribeIntent(fromNumber, businessId, businessName, plan) {
-    if (plan && PLAN_NAMES[plan]) {
+async function handleSubscribeIntent(fromNumber, businessId, businessName, plan) {
+    if (plan && razorpay_1.PLAN_NAMES[plan]) {
         await initiateSubscription(businessId, plan, fromNumber, businessName);
         return;
     }
     // Show plan options
     const message = `Hisab-Kitaab Subscription Plans:\n\n` +
-        `1️⃣ ${PLAN_NAMES.chhota}\n` +
+        `1️⃣ ${razorpay_1.PLAN_NAMES.chhota}\n` +
         `   • 50 invoices/month\n` +
         `   • 100 customers\n` +
         `   • Basic udhaar tracking\n\n` +
-        `2️⃣ ${PLAN_NAMES.vyapari}\n` +
+        `2️⃣ ${razorpay_1.PLAN_NAMES.vyapari}\n` +
         `   • Unlimited invoices & customers\n` +
         `   • Inventory tracking\n` +
         `   • GST return generator\n` +
         `   • 5 languages support\n\n` +
-        `3️⃣ ${PLAN_NAMES.dhanda}\n` +
+        `3️⃣ ${razorpay_1.PLAN_NAMES.dhanda}\n` +
         `   • Everything in Vyapari\n` +
         `   • Staff WhatsApp (up to 3)\n` +
         `   • ONDC integration\n` +
         `   • Bulk reminders\n\n` +
-        `4️⃣ ${PLAN_NAMES.ca}\n` +
+        `4️⃣ ${razorpay_1.PLAN_NAMES.ca}\n` +
         `   • Manage up to 50 client businesses\n` +
         `   • White-label invoice branding\n` +
         `   • Bulk GST filing for all clients\n\n` +
         `Select karne ke liye plan name type karein (e.g., "chhota" ya "vyapari")`;
-    await sendTextMessage(fromNumber, message);
+    await (0, whatsapp_1.sendTextMessage)(fromNumber, message);
 }
