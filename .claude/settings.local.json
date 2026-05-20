@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
+      "Bash(pnpm install *)",
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(pnpm ls *)",
+      "Bash(npx vitest *)",
+      "Bash(npx tsc *)",
+      "Bash(pnpm *)",
+      "Bash(node -e ' *)",
+      "Bash(python3 -c \"import json,sys; versions=json.load\\(sys.stdin\\); print\\([v for v in versions if v.startswith\\('2.'\\)][-1], [v for v in versions if v.startswith\\('3.'\\)][-1] if any\\(v.startswith\\('3.'\\) for v in versions\\) else 'none', [v for v in versions if v.startswith\\('4.'\\)][-1] if any\\(v.startswith\\('4.'\\) for v in versions\\) else 'none', sep='\\\\n'\\)\")",
+      "Bash(node --input-type=module -e ' *)",
+      "Bash(npx tsx -e ' *)",
+      "Bash(npx tsx *)",
+      "Bash(SUPABASE_URL=https://test.supabase.co SUPABASE_SERVICE_ROLE_KEY=test-key UPSTASH_REDIS_URL=redis://localhost:6379 TWILIO_ACCOUNT_SID=test TWILIO_AUTH_TOKEN=test TWILIO_PHONE_NUMBER=+1234567890 META_WEBHOOK_VERIFY_TOKEN=test ANTHROPIC_API_KEY=test OPENAI_API_KEY=test timeout 8 npx tsx src/server.ts)",
+      "Bash(npx *)",
+      "Bash(node /home/hackdit/hisab-kitaab/node_modules/.bin/tsx -e \"console.log\\('works'\\)\")",
+      "Bash(node *)",
+      "Bash(/home/hackdit/hisab-kitaab/node_modules/.pnpm/tsx@4.21.0/node_modules/.bin/tsx *)",
+      "Bash(ls node_modules/.pnpm/tsx*/node_modules/.bin/tsx)",
+      "Bash(apps/backend/node_modules/.bin/tsx --version)",
+      "Bash(apps/backend/node_modules/.bin/tsx *)",
+      "Bash(/home/hackdit/hisab-kitaab/apps/backend/node_modules/.bin/tsx --eval \"import\\('./apps/backend/src/services/invoice-flow'\\).then\\(m => console.log\\('OK', Object.keys\\(m\\).join\\(', '\\)\\)\\).catch\\(e => console.error\\(e\\)\\)\")",
+      "Bash(rm /home/hackdit/hisab-kitaab/_test*.ts)",
+      "Bash(rm /tmp/test*.pdf)"
+    ]
+  }
+}

@@ -1,0 +1,1 @@
+{"version":3,"file":"simple-invoice.d.ts","sourceRoot":"","sources":["../src/simple-invoice.tsx"],"names":[],"mappings":"AAEA,OAAO,KAAK,EAAE,oBAAoB,EAAE,MAAM,SAAS,CAAA;AA2KnD,UAAU,kBAAkB;IAC1B,IAAI,EAAE,oBAAoB,CAAA;CAC3B;AAED,iBAAS,qBAAqB,CAAC,EAAE,IAAI,EAAE,EAAE,kBAAkB,2CA4F1D;AAED,wBAAsB,wBAAwB,CAC5C,IAAI,EAAE,oBAAoB,GACzB,OAAO,CAAC,MAAM,CAAC,CAGjB;AAED,eAAe,qBAAqB,CAAA"}
