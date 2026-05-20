@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import Redis from 'ioredis';
+import { Redis } from '@upstash/redis';
 declare module 'fastify' {
     interface FastifyInstance {
         redis: Redis;

@@ -6,7 +6,7 @@ export const STATE_TTL = 60 * 60 * 24; // 24 hours
 export function initializeState() {
     return { step: 'start' };
 }
-export async function handleOnboarding(fromNumber, message, currentState) {
+export async function handleOnboarding(fromNumber, message, currentState, skipMessage) {
     let state = currentState ?? initializeState();
     let responseMessage = '';
     switch (state.step) {
@@ -42,7 +42,7 @@ export async function handleOnboarding(fromNumber, message, currentState) {
                 const { data: business, error } = await supabase
                     .from('businesses')
                     .insert({
-                    name: state.businessName,
+                    business_name: state.businessName,
                     gstin: state.gstin,
                     whatsapp_number: fromNumber,
                 })
@@ -63,7 +63,7 @@ export async function handleOnboarding(fromNumber, message, currentState) {
                 // Also create the business owner as a customer entry
                 await supabase.from('customers').insert({
                     business_id: business.id,
-                    name: state.businessName,
+                    business_name: state.businessName,
                     whatsapp_number: fromNumber,
                 }).select().single();
                 responseMessage =
@@ -84,17 +84,35 @@ export async function handleOnboarding(fromNumber, message, currentState) {
                 'Aapka business already setup hai. Aap directly invoice bhej shuru kar sakte hain.';
             break;
     }
-    await sendTextMessage(fromNumber, responseMessage);
-    // Save state to Redis
+    // Save state to Redis first — always persist regardless of message delivery
     const stateKey = `whatsapp:state:${fromNumber}`;
-    await redis.set(stateKey, JSON.stringify(state), 'EX', STATE_TTL);
+    console.log('REDIS KEY WRITE:', `whatsapp:state:${fromNumber}`);
+    console.log('REDIS VALUE:', JSON.stringify(state));
+    await redis.set(stateKey, state, { ex: STATE_TTL });
+    // Try to send WhatsApp message — never throw, state is already saved
+    if (!skipMessage) {
+        try {
+            await sendTextMessage(fromNumber, responseMessage);
+        }
+        catch (msgError) {
+            console.error('Error sending WhatsApp message:', msgError);
+        }
+    }
     return { state };
 }
 export async function getState(fromNumber) {
     try {
         const stateKey = `whatsapp:state:${fromNumber}`;
+        console.log('REDIS KEY GET:', stateKey);
         const stateValue = await redis.get(stateKey);
-        return stateValue ? JSON.parse(stateValue) : null;
+        console.log('REDIS GET RESULT:', stateValue);
+        if (!stateValue)
+            return null;
+        // @upstash/redis already parses JSON automatically
+        if (typeof stateValue === 'string') {
+            return JSON.parse(stateValue);
+        }
+        return stateValue;
     }
     catch (error) {
         console.error('Error getting state from Redis:', error);
@@ -103,5 +121,5 @@ export async function getState(fromNumber) {
 }
 export async function saveState(fromNumber, state) {
     const stateKey = `whatsapp:state:${fromNumber}`;
-    await redis.set(stateKey, JSON.stringify(state), 'EX', STATE_TTL);
+    await redis.set(stateKey, state, { ex: STATE_TTL });
 }

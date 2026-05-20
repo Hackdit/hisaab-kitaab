@@ -6,7 +6,7 @@ export interface WhatsAppState {
 }
 export declare const STATE_TTL: number;
 export declare function initializeState(): WhatsAppState;
-export declare function handleOnboarding(fromNumber: string, message: string, currentState: WhatsAppState | null): Promise<{
+export declare function handleOnboarding(fromNumber: string, message: string, currentState: WhatsAppState | null, skipMessage?: boolean): Promise<{
     state: WhatsAppState;
 }>;
 export declare function getState(fromNumber: string): Promise<WhatsAppState | null>;

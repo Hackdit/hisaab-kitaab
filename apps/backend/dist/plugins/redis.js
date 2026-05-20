@@ -1,24 +1,15 @@
-import Redis from 'ioredis';
-const redisUrl = process.env.UPSTASH_REDIS_URL;
-if (!redisUrl) {
-    throw new Error('Missing UPSTASH_REDIS_URL environment variable');
+import dotenv from "dotenv";
+dotenv.config();
+import { Redis } from '@upstash/redis';
+if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    throw new Error('Missing Upstash Redis environment variables');
 }
-export const redis = (() => {
-    const redisToken = process.env.UPSTASH_REDIS_TOKEN;
-    if (redisToken) {
-        const urlObj = new URL(redisUrl);
-        urlObj.password = redisToken;
-        return new Redis(urlObj.toString());
-    }
-    return new Redis(redisUrl);
-})();
+export const redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 const redisPlugin = async (fastify) => {
     fastify.decorate('redis', redis);
-    redis.on('connect', () => {
-        fastify.log.info('Redis connected successfully');
-    });
-    redis.on('error', (err) => {
-        fastify.log.error({ err }, 'Redis connection error');
-    });
+    fastify.log.info('Upstash Redis connected');
 };
 export default redisPlugin;

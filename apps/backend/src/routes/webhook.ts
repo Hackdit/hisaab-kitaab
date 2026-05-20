@@ -1,6 +1,5 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import Twilio from 'twilio';
 import OpenAI from 'openai';
 import { supabase } from '../plugins/supabase';
 import { redis } from '../plugins/redis';
@@ -15,111 +14,74 @@ import { handleSubscribeIntent } from '../services/subscription-manager';
 import { verifyWebhookSignature } from '../services/razorpay';
 import { reconcilePayment, looksLikeBankSms } from '../services/upi-reconciliation';
 
-let twilioClient: ReturnType<typeof Twilio> | null = null;
-
-function getTwilioClient(): ReturnType<typeof Twilio> {
-  if (!twilioClient) {
-    twilioClient = Twilio(
-      process.env.TWILIO_ACCOUNT_SID,
-      process.env.TWILIO_AUTH_TOKEN
-    );
-  }
-  return twilioClient;
-}
-
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const twilioWebhookSchema = z.object({
-  AccountSid: z.string(),
-  MessageSid: z.string(),
-  From: z.string(),
-  To: z.string(),
-  Body: z.string().optional().default(''),
-  NumMedia: z
-    .string()
-    .default('0')
-    .transform((val) => parseInt(val, 10)),
-  MediaContentType0: z.string().optional(),
-  MediaUrl0: z.string().optional(),
+// AiSensy Project API webhook payload shape
+// Docs: aisensy.stoplight.io/docs/project-api
+const aisensyMessageSchema = z.object({
+  message: z.object({
+    from: z.string(),
+    text: z.string().optional().default(''),
+    type: z.string().optional().default('text'),
+    url: z.string().optional(),
+    filename: z.string().optional(),
+    mimeType: z.string().optional(),
+  }),
 });
 
+function normalizeToRedisKey(raw: string): string {
+  // Strip any prefix and ensure +91 format for Redis state keys
+  const cleaned = raw.replace(/^whatsapp:/, '').replace(/^\+/, '');
+  // AiSensy sends without +, add +91 prefix if needed
+  if (cleaned.startsWith('91') && cleaned.length === 12) {
+    return `+${cleaned}`;
+  }
+  if (!cleaned.startsWith('+')) {
+    return `+${cleaned}`;
+  }
+  return cleaned;
+}
+
 export async function webhookRoutes(fastify: FastifyInstance) {
-  // Twilio webhook verification (GET)
-  fastify.get('/whatsapp', async (request, reply) => {
-    const query = request.query as Record<string, string>;
-    const mode = query['hub.mode'];
-    const challenge = query['hub.challenge'];
-    const verifyToken = query['hub.verify_token'];
-
-    if (mode === 'subscribe' && verifyToken === process.env.META_WEBHOOK_VERIFY_TOKEN) {
-      return reply.type('text/plain').send(challenge);
-    }
-    return reply.status(403).send('Forbidden');
-  });
-
-  // WhatsApp incoming message handler (POST)
+  // WhatsApp incoming message handler (AiSensy Project API webhook)
   fastify.post('/whatsapp', async (request, reply) => {
     try {
-      // Verify Twilio signature (skipped in development for ngrok)
-      const twilioSignature = request.headers['x-twilio-signature'] as string;
-      const url = `${request.protocol}://${request.hostname}/webhook/whatsapp`;
-      if (process.env.NODE_ENV === 'production' && twilioSignature) {
-        const isValid = Twilio.validateRequest(
-          process.env.TWILIO_AUTH_TOKEN!,
-          twilioSignature,
-          url,
-          request.body as Record<string, string>
-        );
-        if (!isValid) {
-          fastify.log.warn('Invalid Twilio signature');
-          return reply.status(403).send('Invalid signature');
-        }
-      }
-
-      const parsed = twilioWebhookSchema.safeParse(request.body);
+      const parsed = aisensyMessageSchema.safeParse(request.body);
       if (!parsed.success) {
-        fastify.log.error({ err: parsed.error }, 'Invalid Twilio webhook payload');
-        return reply.status(400).send('Invalid payload');
+        fastify.log.error({ err: parsed.error }, 'Invalid AiSensy webhook payload');
+        return reply.status(200).send({ status: 'ok' });
       }
 
-      const payload = parsed.data;
-      console.log('WEBHOOK: Message received', { from: payload.From, body: payload.Body });
+      const { message } = parsed.data;
+      const fromNumber = normalizeToRedisKey(message.from);
+      const messageText = message.text;
 
-      const fromNumber = payload.From.replace('whatsapp:', '');
-      console.log('WEBHOOK: From number', fromNumber);
-      console.log('REDIS KEY READ:', `whatsapp:state:${fromNumber}`);
-      const messageBody = payload.Body ?? '';
-      const numMedia = payload.NumMedia;
-      const mediaContentType = payload.MediaContentType0;
-      const mediaUrl = payload.MediaUrl0;
+      console.log('WEBHOOK: Message received', { from: message.from, fromRedis: fromNumber, body: messageText, type: message.type });
 
-      let messageText = messageBody;
-
-      // Transcribe audio via Whisper
-      if (numMedia > 0 && mediaContentType?.startsWith('audio/')) {
+      // Transcribe audio via Whisper (if media URL provided by AiSensy)
+      let processedText = messageText;
+      if (message.type === 'audio' && message.url) {
         try {
-          const response = await fetch(mediaUrl!, {
-            headers: {
-              Authorization: `Basic ${Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64')}`,
-            },
-          });
+          const response = await fetch(message.url);
 
           if (!response.ok) {
             throw new Error(`Failed to fetch media: ${response.statusText}`);
           }
 
           const audioBuffer = await response.arrayBuffer();
-          const file = new File([audioBuffer], 'audio.' + mediaContentType.split('/')[1], { type: mediaContentType });
+          const extension = (message.filename?.split('.').pop()) || (message.mimeType?.split('/')[1]) || 'ogg';
+          const file = new File([audioBuffer], `audio.${extension}`, { type: message.mimeType || 'audio/ogg' });
           const transcription = await openai.audio.transcriptions.create({
             file,
             model: 'whisper-1',
           });
 
-          messageText = transcription.text;
-          fastify.log.info(`Transcribed audio: ${messageText}`);
+          processedText = transcription.text;
+          fastify.log.info(`Transcribed audio: ${processedText}`);
         } catch (error) {
           fastify.log.error({ err: error }, 'Error transcribing audio');
-          return reply.status(200).header('Content-Type', 'text/xml').send('<Response></Response>');
+          await sendTextMessage(fromNumber, 'Sorry, I could not process the audio message. Please try again or send a text message.');
+          return reply.status(200).send({ status: 'ok' });
         }
       }
 
@@ -155,12 +117,12 @@ export async function webhookRoutes(fastify: FastifyInstance) {
       // No business → onboarding
       if (!business) {
         console.log('WEBHOOK: Starting onboarding');
-        const result = await handleOnboarding(fromNumber, messageText, state);
+        const result = await handleOnboarding(fromNumber, processedText, state);
         console.log('WEBHOOK: Onboarding result', result);
         if (result?.state) {
           await redis.set(stateKey, JSON.stringify(result.state), { ex: 86400 });
         }
-        return reply.status(200).header('Content-Type', 'text/xml').send('<Response></Response>');
+        return reply.status(200).send({ status: 'ok' });
       }
 
       // Business exists but no Redis state — initialize
@@ -183,7 +145,7 @@ export async function webhookRoutes(fastify: FastifyInstance) {
         console.log('ACTIVE INVOICE FLOW, step:', state.invoiceFlow.step);
         const result = await handleInvoiceFlow(
           fromNumber,
-          messageText,
+          processedText,
           {},
           state,
           business
@@ -191,12 +153,12 @@ export async function webhookRoutes(fastify: FastifyInstance) {
         if (result?.state) {
           await redis.set(stateKey, JSON.stringify(result.state), { ex: 86400 });
         }
-        return reply.status(200).header('Content-Type', 'text/xml').send('<Response></Response>');
+        return reply.status(200).send({ status: 'ok' });
       }
 
       // NLP
       const nlpResult = await processNlp({
-        text: messageText,
+        text: processedText,
         state,
         business_context: { id: business.id, name: business.name, gstin: business.gstin },
       });
@@ -215,31 +177,31 @@ export async function webhookRoutes(fastify: FastifyInstance) {
 
       switch (intent) {
         case 'onboarding':
-          handlerResult = await handleOnboarding(fromNumber, messageText, state);
+          handlerResult = await handleOnboarding(fromNumber, processedText, state);
           break;
         case 'create_invoice':
         case 'invoice':
-          handlerResult = await handleInvoiceFlow(fromNumber, messageText, entities, state, business);
+          handlerResult = await handleInvoiceFlow(fromNumber, processedText, entities, state, business);
           break;
         case 'record_payment':
-          if (looksLikeBankSms(messageText)) {
-            await reconcilePayment(fromNumber, business.id, messageText);
-            return reply.status(200).header('Content-Type', 'text/xml').send('<Response></Response>');
+          if (looksLikeBankSms(processedText)) {
+            await reconcilePayment(fromNumber, business.id, processedText);
+            return reply.status(200).send({ status: 'ok' });
           }
-          handlerResult = await handlePaymentFlow(fromNumber, messageText, entities, state, business);
+          handlerResult = await handlePaymentFlow(fromNumber, processedText, entities, state, business);
           break;
         case 'add_stock':
-          handlerResult = await handleStockFlow(fromNumber, messageText, entities, state, business);
+          handlerResult = await handleStockFlow(fromNumber, processedText, entities, state, business);
           break;
         case 'view_report':
           handlerResult = await handleReportFlow(fromNumber, state, business);
           break;
         case 'subscription':
           await handleSubscribeIntent(fromNumber, business.id, business.name || business.business_name, entities.plan as string | undefined);
-          return reply.status(200).header('Content-Type', 'text/xml').send('<Response></Response>');
+          return reply.status(200).send({ status: 'ok' });
         case 'reconciliation':
-          await reconcilePayment(fromNumber, business.id, messageText);
-          return reply.status(200).header('Content-Type', 'text/xml').send('<Response></Response>');
+          await reconcilePayment(fromNumber, business.id, processedText);
+          return reply.status(200).send({ status: 'ok' });
         case 'check_udhaar':
         case 'send_reminder':
         case 'update_customer':
@@ -261,10 +223,10 @@ export async function webhookRoutes(fastify: FastifyInstance) {
         await redis.set(stateKey, JSON.stringify(handlerResult.state), { ex: 86400 });
       }
 
-      return reply.status(200).header('Content-Type', 'text/xml').send('<Response></Response>');
+      return reply.status(200).send({ status: 'ok' });
     } catch (error) {
       fastify.log.error({ err: error }, 'Unhandled error processing webhook');
-      return reply.status(200).header('Content-Type', 'text/xml').send('<Response></Response>');
+      return reply.status(200).send({ status: 'ok' });
     }
   });
 

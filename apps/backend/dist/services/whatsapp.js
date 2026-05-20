@@ -1,48 +1,60 @@
-import Twilio from 'twilio';
-const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_PHONE_NUMBER;
-let twilioClient = null;
-function getTwilioClient() {
-    if (!twilioClient) {
-        const sid = process.env.TWILIO_ACCOUNT_SID;
-        const token = process.env.TWILIO_AUTH_TOKEN;
-        if (!sid || !token) {
-            throw new Error('Missing TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN environment variables');
-        }
-        twilioClient = Twilio(sid, token);
+// AiSensy WhatsApp Business API (production) — free-form session messages
+// Docs: aisensy.stoplight.io/docs/project-api
+const AISENSY_API_BASE = process.env.AISENSY_API_BASE || 'https://api.aisensy.com';
+const AISENSY_API_TOKEN = process.env.AISENSY_API_TOKEN;
+function normalizePhone(phone) {
+    return phone.replace(/^whatsapp:/, '').replace(/^\+/, '');
+}
+async function sendAiSensyPayload(payload) {
+    if (!AISENSY_API_TOKEN) {
+        console.error('Missing AISENSY_API_TOKEN environment variable');
+        return;
     }
-    return twilioClient;
+    try {
+        const response = await fetch(`${AISENSY_API_BASE}/v1/messages/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                apiKey: AISENSY_API_TOKEN,
+                ...payload,
+            }),
+        });
+        if (!response.ok) {
+            const body = await response.text();
+            console.error('AiSensy API error:', response.status, body);
+        }
+    }
+    catch (err) {
+        console.error('AiSensy send failed:', err);
+    }
 }
 export async function sendTextMessage(to, text) {
-    const fromNumber = TWILIO_WHATSAPP_NUMBER;
-    if (!fromNumber) {
-        throw new Error('Missing TWILIO_WHATSAPP_NUMBER or TWILIO_PHONE_NUMBER environment variable');
-    }
-    await getTwilioClient().messages.create({
-        body: text,
-        from: `whatsapp:${fromNumber}`,
-        to: `whatsapp:${to}`,
+    const destination = normalizePhone(to);
+    await sendAiSensyPayload({
+        destination,
+        message: {
+            type: 'text',
+            text,
+        },
     });
 }
-export async function sendDocument(to, mediaUrl) {
-    const fromNumber = TWILIO_WHATSAPP_NUMBER;
-    if (!fromNumber) {
-        throw new Error('Missing WhatsApp number configuration');
-    }
-    await getTwilioClient().messages.create({
-        mediaUrl: [mediaUrl],
-        from: `whatsapp:${fromNumber}`,
-        to: `whatsapp:${to}`,
+export async function sendDocument(to, mediaUrl, body) {
+    const destination = normalizePhone(to);
+    // Derive filename from the URL or use a fallback
+    const filename = mediaUrl.split('/').pop() || 'document.pdf';
+    await sendAiSensyPayload({
+        destination,
+        message: {
+            type: 'document',
+            document: {
+                url: mediaUrl,
+                filename,
+            },
+            caption: body || '',
+        },
     });
 }
 export async function sendInteractiveButtons(to, body, buttons) {
-    const fromNumber = TWILIO_WHATSAPP_NUMBER;
-    if (!fromNumber) {
-        throw new Error('Missing WhatsApp number configuration');
-    }
     const buttonList = buttons.map((b, i) => `${i + 1}. ${b}`).join('\n');
-    await getTwilioClient().messages.create({
-        body: `${body}\n\nPlease reply with the number of your choice:\n${buttonList}`,
-        from: `whatsapp:${fromNumber}`,
-        to: `whatsapp:${to}`,
-    });
+    await sendTextMessage(to, `${body}\n\nPlease reply with the number of your choice:\n${buttonList}`);
 }

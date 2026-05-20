@@ -20,7 +20,7 @@ import type { TranscribeResult } from './types.js';
  *  3. Return transcript text
  *  4. Clean up temp file
  *
- * @param audioBuffer - Raw audio bytes from WhatsApp/Twilio
+ * @param audioBuffer - Raw audio bytes from WhatsApp (AiSensy)
  * @param mimeType - MIME type of the audio (e.g., 'audio/ogg', 'audio/mp3')
  * @param language - ISO language code hint (default: 'hi' for Hindi)
  */

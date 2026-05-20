@@ -1,3 +1,5 @@
+import dotenv from "dotenv";
+dotenv.config();
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
@@ -39,6 +41,27 @@ server.register(gstRoutes, { prefix: '/api/gst' });
 server.register(authRoutes, { prefix: '/api/auth' });
 // Health check
 server.get('/health', async () => ({ status: 'ok' }));
+// Test endpoint — full onboarding flow without WhatsApp
+server.post('/test/onboarding', async (request, reply) => {
+    const { phone, message } = request.body;
+    // Import handlers
+    const { handleOnboarding, getState } = await import('./services/conversation');
+    // Load existing Redis state
+    const currentState = await getState(phone);
+    // Process message with current state
+    const result = await handleOnboarding(phone, message, currentState, true);
+    // Verify Redis was written by reading it back
+    const { redis } = await import('./plugins/redis');
+    const savedState = await redis.get(`whatsapp:state:${phone}`);
+    return reply.send({
+        success: true,
+        phone,
+        input_state: currentState,
+        output_state: result.state,
+        redis_confirmed: savedState !== null,
+        redis_value: savedState,
+    });
+});
 // Start
 const start = async () => {
     try {

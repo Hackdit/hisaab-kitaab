@@ -10,7 +10,6 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.2",
     "@fastify/cors": "^9.0.0",
-    "@fastify/formbody": "^7.4.0",
     "@fastify/helmet": "^11.0.0",
     "@hisab-kitaab/db": "workspace:*",
     "@hisab-kitaab/gst": "workspace:^",
@@ -22,7 +21,6 @@
     "fastify": "^4.26.0",
     "openai": "^4.0.0",
     "razorpay": "^2.9.0",
-    "twilio": "^5.0.0",
     "zod": "^3.22.0"
   },
   "devDependencies": {

@@ -2,7 +2,6 @@ import dotenv from "dotenv";
 dotenv.config();
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import formbody from '@fastify/formbody';
 import helmet from '@fastify/helmet';
 import supabasePlugin from './plugins/supabase';
 import redisPlugin from './plugins/redis';
@@ -25,7 +24,6 @@ const server = Fastify({ logger: true });
 
 // Security
 server.register(cors, { origin: true });
-server.register(formbody);
 server.register(helmet, { contentSecurityPolicy: false });
 
 // Database plugins

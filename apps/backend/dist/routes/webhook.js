@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import Twilio from 'twilio';
 import OpenAI from 'openai';
 import { supabase } from '../plugins/supabase';
 import { redis } from '../plugins/redis';
@@ -13,157 +12,171 @@ import { handleReportFlow } from '../services/report-flow';
 import { handleSubscribeIntent } from '../services/subscription-manager';
 import { verifyWebhookSignature } from '../services/razorpay';
 import { reconcilePayment, looksLikeBankSms } from '../services/upi-reconciliation';
-let twilioClient = null;
-function getTwilioClient() {
-    if (!twilioClient) {
-        twilioClient = Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    }
-    return twilioClient;
-}
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const twilioWebhookSchema = z.object({
-    AccountSid: z.string(),
-    MessageSid: z.string(),
-    From: z.string(),
-    To: z.string(),
-    Body: z.string().optional().default(''),
-    NumMedia: z
-        .string()
-        .default('0')
-        .transform((val) => parseInt(val, 10)),
-    MediaContentType0: z.string().optional(),
-    MediaUrl0: z.string().optional(),
+// AiSensy Project API webhook payload shape
+// Docs: aisensy.stoplight.io/docs/project-api
+const aisensyMessageSchema = z.object({
+    message: z.object({
+        from: z.string(),
+        text: z.string().optional().default(''),
+        type: z.string().optional().default('text'),
+        url: z.string().optional(),
+        filename: z.string().optional(),
+        mimeType: z.string().optional(),
+    }),
 });
+function normalizeToRedisKey(raw) {
+    // Strip any prefix and ensure +91 format for Redis state keys
+    const cleaned = raw.replace(/^whatsapp:/, '').replace(/^\+/, '');
+    // AiSensy sends without +, add +91 prefix if needed
+    if (cleaned.startsWith('91') && cleaned.length === 12) {
+        return `+${cleaned}`;
+    }
+    if (!cleaned.startsWith('+')) {
+        return `+${cleaned}`;
+    }
+    return cleaned;
+}
 export async function webhookRoutes(fastify) {
-    // Twilio webhook verification (GET)
-    fastify.get('/whatsapp', async (request, reply) => {
-        const query = request.query;
-        const mode = query['hub.mode'];
-        const challenge = query['hub.challenge'];
-        const verifyToken = query['hub.verify_token'];
-        if (mode === 'subscribe' && verifyToken === process.env.META_WEBHOOK_VERIFY_TOKEN) {
-            return reply.type('text/plain').send(challenge);
-        }
-        return reply.status(403).send('Forbidden');
-    });
-    // WhatsApp incoming message handler (POST)
+    // WhatsApp incoming message handler (AiSensy Project API webhook)
     fastify.post('/whatsapp', async (request, reply) => {
-        // Verify Twilio signature
-        const twilioSignature = request.headers['x-twilio-signature'];
-        if (twilioSignature) {
-            const url = `${request.protocol}://${request.hostname}/webhook/whatsapp`;
-            const isValid = getTwilioClient().validateRequest(twilioSignature, url, request.body);
-            if (!isValid) {
-                fastify.log.warn('Invalid Twilio signature');
-                return reply.status(403).send('Invalid signature');
+        try {
+            const parsed = aisensyMessageSchema.safeParse(request.body);
+            if (!parsed.success) {
+                fastify.log.error({ err: parsed.error }, 'Invalid AiSensy webhook payload');
+                return reply.status(200).send({ status: 'ok' });
             }
-        }
-        const parsed = twilioWebhookSchema.safeParse(request.body);
-        if (!parsed.success) {
-            fastify.log.error({ err: parsed.error }, 'Invalid Twilio webhook payload');
-            return reply.status(400).send('Invalid payload');
-        }
-        const payload = parsed.data;
-        const fromNumber = payload.From.replace('whatsapp:', '');
-        const messageBody = payload.Body ?? '';
-        const numMedia = payload.NumMedia;
-        const mediaContentType = payload.MediaContentType0;
-        const mediaUrl = payload.MediaUrl0;
-        let messageText = messageBody;
-        // Transcribe audio via Whisper
-        if (numMedia > 0 && mediaContentType?.startsWith('audio/')) {
-            try {
-                const response = await fetch(mediaUrl, {
-                    headers: {
-                        Authorization: `Basic ${Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64')}`,
-                    },
-                });
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch media: ${response.statusText}`);
+            const { message } = parsed.data;
+            const fromNumber = normalizeToRedisKey(message.from);
+            const messageText = message.text;
+            console.log('WEBHOOK: Message received', { from: message.from, fromRedis: fromNumber, body: messageText, type: message.type });
+            // Transcribe audio via Whisper (if media URL provided by AiSensy)
+            let processedText = messageText;
+            if (message.type === 'audio' && message.url) {
+                try {
+                    const response = await fetch(message.url);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch media: ${response.statusText}`);
+                    }
+                    const audioBuffer = await response.arrayBuffer();
+                    const extension = (message.filename?.split('.').pop()) || (message.mimeType?.split('/')[1]) || 'ogg';
+                    const file = new File([audioBuffer], `audio.${extension}`, { type: message.mimeType || 'audio/ogg' });
+                    const transcription = await openai.audio.transcriptions.create({
+                        file,
+                        model: 'whisper-1',
+                    });
+                    processedText = transcription.text;
+                    fastify.log.info(`Transcribed audio: ${processedText}`);
                 }
-                const audioBuffer = await response.arrayBuffer();
-                const file = new File([audioBuffer], 'audio.' + mediaContentType.split('/')[1], { type: mediaContentType });
-                const transcription = await openai.audio.transcriptions.create({
-                    file,
-                    model: 'whisper-1',
-                });
-                messageText = transcription.text;
-                fastify.log.info(`Transcribed audio: ${messageText}`);
+                catch (error) {
+                    fastify.log.error({ err: error }, 'Error transcribing audio');
+                    await sendTextMessage(fromNumber, 'Sorry, I could not process the audio message. Please try again or send a text message.');
+                    return reply.status(200).send({ status: 'ok' });
+                }
             }
-            catch (error) {
-                fastify.log.error({ err: error }, 'Error transcribing audio');
-                await sendTextMessage(fromNumber, 'Sorry, I could not process the audio message. Please try again or send a text message.');
-                return reply.status(200).send('OK');
+            // Load Redis state
+            const stateKey = `whatsapp:state:${fromNumber}`;
+            let state = null;
+            try {
+                const raw = await redis.get(stateKey);
+                if (raw) {
+                    // @upstash/redis already parses JSON automatically
+                    // so raw is already an object, not a string
+                    state = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                    console.log('REDIS LOADED STATE:', state);
+                }
             }
-        }
-        // Load Redis state
-        const stateKey = `whatsapp:state:${fromNumber}`;
-        let state = null;
-        try {
-            const raw = await redis.get(stateKey);
-            if (raw)
-                state = JSON.parse(raw);
-        }
-        catch {
-            // continue with null state
-        }
-        // Look up business by the sender's number
-        let business = null;
-        try {
-            const { data } = await supabase
-                .from('businesses')
-                .select('*')
-                .eq('whatsapp_number', fromNumber)
-                .single();
-            business = data;
-        }
-        catch {
-            // no matching business — will trigger onboarding
-        }
-        // No business → onboarding
-        if (!business) {
-            const result = await handleOnboarding(fromNumber, messageText, state);
-            if (result?.state) {
-                await redis.set(stateKey, JSON.stringify(result.state), 'EX', 86400);
+            catch (err) {
+                console.error('REDIS READ ERROR:', err);
             }
-            return reply.status(200).send('OK');
-        }
-        // NLP
-        const nlpResult = await processNlp({
-            text: messageText,
-            state,
-            business_context: { id: business.id, name: business.name, gstin: business.gstin },
-        });
-        const { intent, entities } = nlpResult;
-        // Route by intent
-        let handlerResult;
-        try {
+            // Look up business by the sender's number
+            let business = null;
+            try {
+                const { data } = await supabase
+                    .from('businesses')
+                    .select('*')
+                    .eq('whatsapp_number', fromNumber)
+                    .single();
+                business = data;
+            }
+            catch {
+                // no matching business — will trigger onboarding
+            }
+            console.log('WEBHOOK: Business found', business ? business.id : 'NOT FOUND');
+            // No business → onboarding
+            if (!business) {
+                console.log('WEBHOOK: Starting onboarding');
+                const result = await handleOnboarding(fromNumber, processedText, state);
+                console.log('WEBHOOK: Onboarding result', result);
+                if (result?.state) {
+                    await redis.set(stateKey, JSON.stringify(result.state), { ex: 86400 });
+                }
+                return reply.status(200).send({ status: 'ok' });
+            }
+            // Business exists but no Redis state — initialize
+            if (business && !state) {
+                state = {
+                    step: 'complete',
+                    businessName: business.business_name,
+                    gstin: business.gstin,
+                };
+                await redis.set(stateKey, state, { ex: 86400 });
+                console.log('INITIALIZED MISSING REDIS STATE for existing business');
+            }
+            // ── Debug: invoice flow state ──
+            console.log('FULL REDIS STATE:', JSON.stringify(state));
+            console.log('INVOICE FLOW ACTIVE:', state?.invoiceFlow?.active);
+            // ── Active invoice flow — bypass NLP ──
+            if (state?.invoiceFlow?.active) {
+                console.log('ACTIVE INVOICE FLOW, step:', state.invoiceFlow.step);
+                const result = await handleInvoiceFlow(fromNumber, processedText, {}, state, business);
+                if (result?.state) {
+                    await redis.set(stateKey, JSON.stringify(result.state), { ex: 86400 });
+                }
+                return reply.status(200).send({ status: 'ok' });
+            }
+            // NLP
+            const nlpResult = await processNlp({
+                text: processedText,
+                state,
+                business_context: { id: business.id, name: business.name, gstin: business.gstin },
+            });
+            console.log('NLP RESULT:', JSON.stringify({
+                intent: nlpResult.intent,
+                entities: nlpResult.entities,
+                confidence: nlpResult.confidence,
+            }));
+            const { intent, entities } = nlpResult;
+            console.log('ROUTING TO INTENT:', intent);
+            // Route by intent
+            let handlerResult;
             switch (intent) {
                 case 'onboarding':
-                    handlerResult = await handleOnboarding(fromNumber, messageText, state);
+                    handlerResult = await handleOnboarding(fromNumber, processedText, state);
                     break;
                 case 'create_invoice':
-                    handlerResult = await handleInvoiceFlow(fromNumber, messageText, entities, state, business);
+                case 'invoice':
+                    handlerResult = await handleInvoiceFlow(fromNumber, processedText, entities, state, business);
                     break;
                 case 'record_payment':
-                    if (looksLikeBankSms(messageText)) {
-                        await reconcilePayment(fromNumber, business.id, messageText);
-                        return reply.status(200).send('OK');
+                    if (looksLikeBankSms(processedText)) {
+                        await reconcilePayment(fromNumber, business.id, processedText);
+                        return reply.status(200).send({ status: 'ok' });
                     }
-                    handlerResult = await handlePaymentFlow(fromNumber, messageText, entities, state, business);
+                    handlerResult = await handlePaymentFlow(fromNumber, processedText, entities, state, business);
                     break;
                 case 'add_stock':
-                    handlerResult = await handleStockFlow(fromNumber, messageText, entities, state, business);
+                    handlerResult = await handleStockFlow(fromNumber, processedText, entities, state, business);
                     break;
                 case 'view_report':
                     handlerResult = await handleReportFlow(fromNumber, state, business);
                     break;
                 case 'subscription':
                     await handleSubscribeIntent(fromNumber, business.id, business.name || business.business_name, entities.plan);
-                    return reply.status(200).send('OK');
+                    return reply.status(200).send({ status: 'ok' });
                 case 'reconciliation':
-                    await reconcilePayment(fromNumber, business.id, messageText);
-                    return reply.status(200).send('OK');
+                    await reconcilePayment(fromNumber, business.id, processedText);
+                    return reply.status(200).send({ status: 'ok' });
                 case 'check_udhaar':
                 case 'send_reminder':
                 case 'update_customer':
@@ -176,17 +189,16 @@ export async function webhookRoutes(fastify) {
                     await sendTextMessage(fromNumber, nlpResult.response ||
                         "I'm not sure how to help with that. Please try rephrasing.");
             }
+            // Update Redis state if handler returned one
+            if (handlerResult?.state) {
+                await redis.set(stateKey, JSON.stringify(handlerResult.state), { ex: 86400 });
+            }
+            return reply.status(200).send({ status: 'ok' });
         }
         catch (error) {
-            fastify.log.error({ err: error, intent }, `Error handling intent ${intent}`);
-            await sendTextMessage(fromNumber, 'Sorry, there was an error processing your request. Please try again later.');
-            return reply.status(200).send('OK');
+            fastify.log.error({ err: error }, 'Unhandled error processing webhook');
+            return reply.status(200).send({ status: 'ok' });
         }
-        // Update Redis state if handler returned one
-        if (handlerResult?.state) {
-            await redis.set(stateKey, JSON.stringify(handlerResult.state), 'EX', 86400);
-        }
-        return reply.status(200).send('OK');
     });
     // ─── Razorpay Webhook ───────────────────────────────────────────────────
     fastify.post('/razorpay', async (request, reply) => {
