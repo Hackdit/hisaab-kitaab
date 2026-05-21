@@ -242,6 +242,13 @@ async function webhookRoutes(fastify) {
                 case 'help':
                     await (0, whatsapp_1.sendTextMessage)(fromNumber, nlpResult.response);
                     break;
+                case 'unknown':
+                    await (0, whatsapp_1.sendTextMessage)(fromNumber, `मुझे समझ नहीं आया। कृपया कोशिश करें:\n\n` +
+                        `📄 "Bill banao" - नया invoice\n` +
+                        `💰 "Payment mila" - payment track करें\n` +
+                        `📦 "Stock aaya" - inventory update\n` +
+                        `❓ "Help" - मदद के लिए`);
+                    break;
                 default:
                     await (0, whatsapp_1.sendTextMessage)(fromNumber, nlpResult.response ||
                         "I'm not sure how to help with that. Please try rephrasing.");

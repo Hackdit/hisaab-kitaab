@@ -230,6 +230,16 @@ export async function webhookRoutes(fastify: FastifyInstance) {
         case 'help':
           await sendTextMessage(fromNumber, nlpResult.response);
           break;
+        case 'unknown':
+          await sendTextMessage(
+            fromNumber,
+            `मुझे समझ नहीं आया। कृपया कोशिश करें:\n\n` +
+            `📄 "Bill banao" - नया invoice\n` +
+            `💰 "Payment mila" - payment track करें\n` +
+            `📦 "Stock aaya" - inventory update\n` +
+            `❓ "Help" - मदद के लिए`
+          );
+          break;
         default:
           await sendTextMessage(
             fromNumber,
