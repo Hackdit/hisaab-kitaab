@@ -48,6 +48,12 @@ export async function webhookRoutes(fastify: FastifyInstance) {
   // WhatsApp incoming message handler (AiSensy Project API webhook)
   fastify.post('/whatsapp', async (request, reply) => {
     try {
+      // Ignore status update webhooks - only process incoming messages
+      const topic = (request.body as any).topic;
+      if (topic === 'message.status.updated') {
+        return reply.status(200).send({ status: 'ok' });
+      }
+
       // ═══ CRITICAL DEBUG: log raw payload BEFORE any processing ═══
       console.log('RAW AISENSY PAYLOAD:', JSON.stringify(request.body, null, 2));
 
