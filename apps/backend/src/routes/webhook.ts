@@ -18,16 +18,18 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // AiSensy Project API webhook payload shape
 // Docs: aisensy.stoplight.io/docs/project-api
+// NOTE: All fields optional because AiSensy sometimes sends unexpected payload shapes.
 const aisensyMessageSchema = z.object({
   message: z.object({
-    from: z.string(),
+    from: z.string().optional().default(''),
     text: z.string().optional().default(''),
     type: z.string().optional().default('text'),
     url: z.string().optional(),
     filename: z.string().optional(),
     mimeType: z.string().optional(),
-  }),
-});
+  }).optional().default({ from: '', text: '' }),
+  // Accept any other fields AiSensy sends
+}).passthrough();
 
 function normalizeToRedisKey(raw: string): string {
   // Strip any prefix and ensure +91 format for Redis state keys
@@ -46,9 +48,21 @@ export async function webhookRoutes(fastify: FastifyInstance) {
   // WhatsApp incoming message handler (AiSensy Project API webhook)
   fastify.post('/whatsapp', async (request, reply) => {
     try {
+      // ═══ CRITICAL DEBUG: log raw payload BEFORE any processing ═══
+      console.log('RAW AISENSY PAYLOAD:', JSON.stringify(request.body, null, 2));
+
       const parsed = aisensyMessageSchema.safeParse(request.body);
       if (!parsed.success) {
-        fastify.log.error({ err: parsed.error }, 'Invalid AiSensy webhook payload');
+        fastify.log.error({ err: parsed.error, body: request.body }, 'Invalid AiSensy webhook payload');
+        // Fallback: try to extract message from common alternate shapes
+        const body: any = request.body;
+        const from = body?.from || body?.waId || body?.phone || '';
+        const text = body?.text || body?.body || body?.message || '';
+        if (from) {
+          console.log('FALLBACK: extracted from=', from, 'text=', text);
+          const fromNumber = normalizeToRedisKey(from);
+          await sendTextMessage(fromNumber, 'Thanks for your message! Processing...');
+        }
         return reply.status(200).send({ status: 'ok' });
       }
 
