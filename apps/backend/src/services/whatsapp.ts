@@ -1,7 +1,6 @@
-// AiSensy WhatsApp Business API (production) — free-form session messages
+// AiSensy WhatsApp Business API — Project API (session messages)
 // Docs: aisensy.stoplight.io/docs/project-api
 
-const AISENSY_API_BASE = process.env.AISENSY_API_BASE || 'https://api.aisensy.com';
 const AISENSY_API_TOKEN = process.env.AISENSY_API_TOKEN;
 
 function normalizePhone(phone: string): string {
@@ -14,15 +13,20 @@ async function sendAiSensyPayload(payload: Record<string, unknown>): Promise<voi
     return;
   }
 
+  const projectId = process.env.AISENSY_PROJECT_ID || '6a09c9ce6e9fd727cf01bceb';
+
   try {
-    const response = await fetch(`${AISENSY_API_BASE}/v1/messages/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        apiKey: AISENSY_API_TOKEN,
-        ...payload,
-      }),
-    });
+    const response = await fetch(
+      `https://apis.aisensy.com/project-apis/v1/project/${projectId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-AiSensy-Project-API-Pwd': AISENSY_API_TOKEN,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
 
     if (!response.ok) {
       const body = await response.text();
@@ -36,29 +40,28 @@ async function sendAiSensyPayload(payload: Record<string, unknown>): Promise<voi
 export async function sendTextMessage(to: string, text: string): Promise<void> {
   const destination = normalizePhone(to);
   await sendAiSensyPayload({
-    destination,
-    message: {
-      type: 'text',
-      text,
+    to: destination,
+    type: 'text',
+    recipient_type: 'individual',
+    text: {
+      body: text,
     },
   });
 }
 
-export async function sendDocument(to: string, mediaUrl: string, body?: string): Promise<void> {
+export async function sendDocument(to: string, mediaUrl: string, caption?: string): Promise<void> {
   const destination = normalizePhone(to);
-  // Derive filename from the URL or use a fallback
   const filename = mediaUrl.split('/').pop() || 'document.pdf';
 
   await sendAiSensyPayload({
-    destination,
-    message: {
-      type: 'document',
-      document: {
-        url: mediaUrl,
-        filename,
-      },
-      caption: body || '',
+    to: destination,
+    type: 'document',
+    recipient_type: 'individual',
+    document: {
+      link: mediaUrl,
+      filename,
     },
+    ...(caption && { caption: { body: caption } }),
   });
 }
 
