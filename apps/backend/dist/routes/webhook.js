@@ -54,16 +54,18 @@ const upi_reconciliation_1 = require("../services/upi-reconciliation");
 const openai = new openai_1.default({ apiKey: process.env.OPENAI_API_KEY });
 // AiSensy Project API webhook payload shape
 // Docs: aisensy.stoplight.io/docs/project-api
+// Payload is nested under data.message — not flat at top level
 const aisensyMessageSchema = zod_1.z.object({
-    message: zod_1.z.object({
-        from: zod_1.z.string(),
-        text: zod_1.z.string().optional().default(''),
-        type: zod_1.z.string().optional().default('text'),
-        url: zod_1.z.string().optional(),
-        filename: zod_1.z.string().optional(),
-        mimeType: zod_1.z.string().optional(),
-    }),
-});
+    data: zod_1.z.object({
+        message: zod_1.z.object({
+            phone_number: zod_1.z.string(),
+            message_content: zod_1.z.object({
+                text: zod_1.z.string().optional().default('')
+            }),
+            message_type: zod_1.z.string().optional().default('TEXT')
+        })
+    })
+}).passthrough();
 function normalizeToRedisKey(raw) {
     // Strip any prefix and ensure +91 format for Redis state keys
     const cleaned = raw.replace(/^whatsapp:/, '').replace(/^\+/, '');
@@ -80,26 +82,42 @@ async function webhookRoutes(fastify) {
     // WhatsApp incoming message handler (AiSensy Project API webhook)
     fastify.post('/whatsapp', async (request, reply) => {
         try {
+            // ═══ CRITICAL DEBUG: log raw payload BEFORE any processing ═══
+            console.log('RAW AISENSY PAYLOAD:', JSON.stringify(request.body, null, 2));
             const parsed = aisensyMessageSchema.safeParse(request.body);
             if (!parsed.success) {
-                fastify.log.error({ err: parsed.error }, 'Invalid AiSensy webhook payload');
+                fastify.log.error({ err: parsed.error, body: request.body }, 'Invalid AiSensy webhook payload');
+                // Fallback: try to extract message from nested AiSensy structure or flat shapes
+                const b = request.body;
+                const from = b?.data?.message?.phone_number || b?.from || b?.waId || b?.phone || '';
+                const text = b?.data?.message?.message_content?.text || b?.text || b?.body || b?.message || '';
+                if (from) {
+                    console.log('FALLBACK: extracted from=', from, 'text=', text);
+                    const fromNumber = normalizeToRedisKey(from);
+                    await (0, whatsapp_1.sendTextMessage)(fromNumber, 'Thanks for your message! Processing...');
+                }
                 return reply.status(200).send({ status: 'ok' });
             }
-            const { message } = parsed.data;
-            const fromNumber = normalizeToRedisKey(message.from);
-            const messageText = message.text;
-            console.log('WEBHOOK: Message received', { from: message.from, fromRedis: fromNumber, body: messageText, type: message.type });
+            const { data } = parsed.data;
+            const from = data.message.phone_number;
+            const messageText = data.message.message_content.text;
+            const messageType = data.message.message_type.toLowerCase();
+            const messageUrl = data.message?.message_content?.media?.url;
+            const messageFilename = data.message?.message_content?.media?.filename;
+            const messageMimeType = data.message?.message_content?.media?.mime_type;
+            const fromNumber = normalizeToRedisKey(from);
+            console.log('WEBHOOK: Message received', { from, fromRedis: fromNumber, body: messageText, type: messageType });
             // Transcribe audio via Whisper (if media URL provided by AiSensy)
             let processedText = messageText;
-            if (message.type === 'audio' && message.url) {
+            if (messageType === 'audio' && messageUrl) {
                 try {
-                    const response = await fetch(message.url);
+                    const response = await fetch(messageUrl);
                     if (!response.ok) {
                         throw new Error(`Failed to fetch media: ${response.statusText}`);
                     }
                     const audioBuffer = await response.arrayBuffer();
-                    const extension = (message.filename?.split('.').pop()) || (message.mimeType?.split('/')[1]) || 'ogg';
-                    const file = new File([audioBuffer], `audio.${extension}`, { type: message.mimeType || 'audio/ogg' });
+                    const extension = (messageFilename?.split('.').pop()) || (messageMimeType?.split('/')[1]) || 'ogg';
+                    const file = new File([audioBuffer], `audio.${extension}`, { type: messageMimeType || 'audio/ogg' });
                     const transcription = await openai.audio.transcriptions.create({
                         file,
                         model: 'whisper-1',

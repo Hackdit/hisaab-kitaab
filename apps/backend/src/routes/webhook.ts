@@ -18,17 +18,17 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // AiSensy Project API webhook payload shape
 // Docs: aisensy.stoplight.io/docs/project-api
-// NOTE: All fields optional because AiSensy sometimes sends unexpected payload shapes.
+// Payload is nested under data.message — not flat at top level
 const aisensyMessageSchema = z.object({
-  message: z.object({
-    from: z.string().optional().default(''),
-    text: z.string().optional().default(''),
-    type: z.string().optional().default('text'),
-    url: z.string().optional(),
-    filename: z.string().optional(),
-    mimeType: z.string().optional(),
-  }).optional().default({ from: '', text: '' }),
-  // Accept any other fields AiSensy sends
+  data: z.object({
+    message: z.object({
+      phone_number: z.string(),
+      message_content: z.object({
+        text: z.string().optional().default('')
+      }),
+      message_type: z.string().optional().default('TEXT')
+    })
+  })
 }).passthrough();
 
 function normalizeToRedisKey(raw: string): string {
@@ -54,10 +54,10 @@ export async function webhookRoutes(fastify: FastifyInstance) {
       const parsed = aisensyMessageSchema.safeParse(request.body);
       if (!parsed.success) {
         fastify.log.error({ err: parsed.error, body: request.body }, 'Invalid AiSensy webhook payload');
-        // Fallback: try to extract message from common alternate shapes
-        const body: any = request.body;
-        const from = body?.from || body?.waId || body?.phone || '';
-        const text = body?.text || body?.body || body?.message || '';
+        // Fallback: try to extract message from nested AiSensy structure or flat shapes
+        const b: any = request.body;
+        const from = b?.data?.message?.phone_number || b?.from || b?.waId || b?.phone || '';
+        const text = b?.data?.message?.message_content?.text || b?.text || b?.body || b?.message || '';
         if (from) {
           console.log('FALLBACK: extracted from=', from, 'text=', text);
           const fromNumber = normalizeToRedisKey(from);
@@ -66,25 +66,31 @@ export async function webhookRoutes(fastify: FastifyInstance) {
         return reply.status(200).send({ status: 'ok' });
       }
 
-      const { message } = parsed.data;
-      const fromNumber = normalizeToRedisKey(message.from);
-      const messageText = message.text;
+      const { data } = parsed.data;
+      const from = data.message.phone_number;
+      const messageText = data.message.message_content.text;
+      const messageType = data.message.message_type.toLowerCase();
+      const messageUrl = (data.message as any)?.message_content?.media?.url;
+      const messageFilename = (data.message as any)?.message_content?.media?.filename;
+      const messageMimeType = (data.message as any)?.message_content?.media?.mime_type;
 
-      console.log('WEBHOOK: Message received', { from: message.from, fromRedis: fromNumber, body: messageText, type: message.type });
+      const fromNumber = normalizeToRedisKey(from);
+
+      console.log('WEBHOOK: Message received', { from, fromRedis: fromNumber, body: messageText, type: messageType });
 
       // Transcribe audio via Whisper (if media URL provided by AiSensy)
       let processedText = messageText;
-      if (message.type === 'audio' && message.url) {
+      if (messageType === 'audio' && messageUrl) {
         try {
-          const response = await fetch(message.url);
+          const response = await fetch(messageUrl);
 
           if (!response.ok) {
             throw new Error(`Failed to fetch media: ${response.statusText}`);
           }
 
           const audioBuffer = await response.arrayBuffer();
-          const extension = (message.filename?.split('.').pop()) || (message.mimeType?.split('/')[1]) || 'ogg';
-          const file = new File([audioBuffer], `audio.${extension}`, { type: message.mimeType || 'audio/ogg' });
+          const extension = (messageFilename?.split('.').pop()) || (messageMimeType?.split('/')[1]) || 'ogg';
+          const file = new File([audioBuffer], `audio.${extension}`, { type: messageMimeType || 'audio/ogg' });
           const transcription = await openai.audio.transcriptions.create({
             file,
             model: 'whisper-1',
